@@ -1,0 +1,990 @@
+local NexusUI = {}
+NexusUI.__index = NexusUI
+
+-- Services
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Color palette
+NexusUI.Colors = {
+    Primary = Color3.fromRGB(99, 102, 241),
+    PrimaryDark = Color3.fromRGB(79, 70, 229),
+    Secondary = Color3.fromRGB(244, 63, 94),
+    Dark = Color3.fromRGB(30, 41, 59),
+    Darker = Color3.fromRGB(15, 23, 42),
+    Light = Color3.fromRGB(248, 250, 252),
+    Gray = Color3.fromRGB(100, 116, 139),
+    GrayLight = Color3.fromRGB(203, 213, 225),
+    Success = Color3.fromRGB(16, 185, 129),
+    Warning = Color3.fromRGB(245, 158, 11),
+    Error = Color3.fromRGB(239, 68, 68)
+}
+
+-- Animation presets
+NexusUI.Animations = {
+    ButtonHover = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    ButtonClick = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    FadeIn = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    SlideIn = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+}
+
+-- Main Library Initialization
+function NexusUI:Init(options)
+    local self = setmetatable({}, NexusUI)
+    self.options = options or {}
+    self.Parent = CoreGui
+    self.Components = {}
+    self.Windows = {}
+    self.Tabs = {}
+    self.Sections = {}
+    self.Verified = false
+    self.KeySystemEnabled = options.KeySystem or false
+    self.DiscordInvite = options.DiscordInvite or "https://discord.gg/example"
+    self.CurrentWindow = nil
+    self.CurrentTab = nil
+    self.CurrentSection = nil
+    self.Flags = {}
+    
+    return self
+end
+
+-- Utility functions
+function NexusUI:CreateElement(className, properties)
+    local element = Instance.new(className)
+    for property, value in pairs(properties) do
+        element[property] = value
+    end
+    return element
+end
+
+function NexusUI:ApplyTheme(element, theme)
+    local defaultTheme = {
+        BackgroundColor3 = self.Colors.Dark,
+        TextColor3 = self.Colors.Light,
+        BorderColor3 = self.Colors.Gray,
+        BorderSizePixel = 0
+    }
+    
+    for property, value in pairs(theme or defaultTheme) do
+        if element[property] ~= nil then
+            element[property] = value
+        end
+    end
+end
+
+-- Key System
+function NexusUI:ValidateKey(key)
+    if not self.KeySystemEnabled then
+        self.Verified = true
+        return true
+    end
+    
+    local validKeys = {
+        "NEXUS-PREMIUM-2024",
+        "NEXUS-VIP-ACCESS", 
+        "DEVELOPER-KEY-001",
+        "TEST-KEY-12345",
+        "RAYFIELD-BETTER",
+        "NEXUS-BEST-UI"
+    }
+    
+    for _, validKey in pairs(validKeys) do
+        if key == validKey then
+            self.Verified = true
+            return true
+        end
+    end
+    
+    return false
+end
+
+function NexusUI:CreateKeySystem()
+    if not self.KeySystemEnabled then
+        self.Verified = true
+        return true
+    end
+    
+    local keyInterface = self:CreateElement("ScreenGui", {
+        Name = "NexusKeySystem",
+        DisplayOrder = 999,
+        Parent = self.Parent
+    })
+
+    local background = self:CreateElement("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.3,
+        Parent = keyInterface
+    })
+
+    local mainFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 400, 0, 300),
+        Position = UDim2.new(0.5, -200, 0.5, -150),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Darker,
+        Parent = keyInterface
+    })
+
+    local corner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 16),
+        Parent = mainFrame
+    })
+
+    local stroke = self:CreateElement("UIStroke", {
+        Color = self.Colors.Primary,
+        Thickness = 2,
+        Parent = mainFrame
+    })
+
+    local title = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 60),
+        BackgroundTransparency = 1,
+        Text = "NEXUS UI - KEY SYSTEM",
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = 24,
+        Parent = mainFrame
+    })
+
+    local subtitle = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 50),
+        BackgroundTransparency = 1,
+        Text = "Enter your premium key to continue",
+        TextColor3 = self.Colors.GrayLight,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        Parent = mainFrame
+    })
+
+    local keyBox = self:CreateElement("TextBox", {
+        Size = UDim2.new(0, 300, 0, 45),
+        Position = UDim2.new(0.5, -150, 0.5, -22),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Dark,
+        TextColor3 = self.Colors.Light,
+        PlaceholderText = "Enter your key here...",
+        PlaceholderColor3 = self.Colors.Gray,
+        Font = Enum.Font.Gotham,
+        TextSize = 16,
+        Text = "",
+        Parent = mainFrame
+    })
+
+    local keyBoxCorner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = keyBox
+    })
+
+    local submitButton = self:CreateElement("TextButton", {
+        Size = UDim2.new(0, 200, 0, 45),
+        Position = UDim2.new(0.5, -100, 0.8, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Primary,
+        TextColor3 = self.Colors.Light,
+        Text = "SUBMIT KEY",
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 16,
+        AutoButtonColor = false,
+        Parent = mainFrame
+    })
+
+    local submitCorner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = submitButton
+    })
+
+    local resultLabel = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, -40, 0, 30),
+        Position = UDim2.new(0, 20, 0, 200),
+        BackgroundTransparency = 1,
+        Text = "",
+        TextColor3 = self.Colors.Error,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextWrapped = true,
+        Visible = false,
+        Parent = mainFrame
+    })
+
+    -- Animations
+    mainFrame.BackgroundTransparency = 1
+    keyInterface.Enabled = true
+
+    local fadeIn = TweenService:Create(mainFrame, self.Animations.FadeIn, {
+        BackgroundTransparency = 0
+    })
+    fadeIn:Play()
+
+    -- Submit handler
+    local function submitKey()
+        local key = keyBox.Text
+        if self:ValidateKey(key) then
+            resultLabel.Text = "✅ Key validated successfully!"
+            resultLabel.TextColor3 = self.Colors.Success
+            resultLabel.Visible = true
+            
+            local fadeOut = TweenService:Create(mainFrame, self.Animations.FadeIn, {
+                BackgroundTransparency = 1
+            })
+            fadeOut:Play()
+            fadeOut.Completed:Wait()
+            keyInterface:Destroy()
+            return true
+        else
+            resultLabel.Text = "❌ Invalid key. Please try again."
+            resultLabel.TextColor3 = self.Colors.Error
+            resultLabel.Visible = true
+            
+            -- Shake animation
+            local shake1 = TweenService:Create(mainFrame, TweenInfo.new(0.1), {
+                Position = UDim2.new(0.5, -190, 0.5, -150)
+            })
+            local shake2 = TweenService:Create(mainFrame, TweenInfo.new(0.1), {
+                Position = UDim2.new(0.5, -210, 0.5, -150)
+            })
+            local reset = TweenService:Create(mainFrame, TweenInfo.new(0.1), {
+                Position = UDim2.new(0.5, -200, 0.5, -150)
+            })
+            
+            shake1:Play()
+            shake1.Completed:Wait()
+            shake2:Play()
+            shake2.Completed:Wait()
+            reset:Play()
+        end
+        return false
+    end
+
+    submitButton.MouseButton1Click:Connect(submitKey)
+    
+    keyBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            submitKey()
+        end
+    end)
+
+    -- Button animations
+    submitButton.MouseEnter:Connect(function()
+        TweenService:Create(submitButton, self.Animations.ButtonHover, {
+            BackgroundColor3 = self.Colors.PrimaryDark
+        }):Play()
+    end)
+
+    submitButton.MouseLeave:Connect(function()
+        TweenService:Create(submitButton, self.Animations.ButtonHover, {
+            BackgroundColor3 = self.Colors.Primary
+        }):Play()
+    end)
+
+    submitButton.MouseButton1Down:Connect(function()
+        TweenService:Create(submitButton, self.Animations.ButtonClick, {
+            BackgroundColor3 = self.Colors.PrimaryDark,
+            Size = UDim2.new(0, 190, 0, 43)
+        }):Play()
+    end)
+
+    submitButton.MouseButton1Up:Connect(function()
+        TweenService:Create(submitButton, self.Animations.ButtonClick, {
+            BackgroundColor3 = self.Colors.PrimaryDark,
+            Size = UDim2.new(0, 200, 0, 45)
+        }):Play()
+    end)
+
+    table.insert(self.Components, keyInterface)
+    return false
+end
+
+-- Discord Integration
+function NexusUI:CreateDiscordButton(options)
+    local discordButton = self:CreateElement("TextButton", {
+        Name = "DiscordButton",
+        Size = options.Size or UDim2.new(0, 120, 0, 40),
+        Position = options.Position or UDim2.new(1, -130, 1, -50),
+        AnchorPoint = Vector2.new(1, 1),
+        BackgroundColor3 = self.Colors.Primary,
+        TextColor3 = self.Colors.Light,
+        Text = "DISCORD",
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 14,
+        AutoButtonColor = false,
+        Parent = options.Parent or self.Parent
+    })
+
+    local corner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = discordButton
+    })
+
+    local stroke = self:CreateElement("UIStroke", {
+        Color = self.Colors.PrimaryDark,
+        Thickness = 2,
+        Parent = discordButton
+    })
+
+    local icon = self:CreateElement("ImageLabel", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(0, 10, 0.5, -10),
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://3926305904", -- Discord icon
+        ImageRectSize = Vector2.new(24, 24),
+        ImageRectOffset = Vector2.new(324, 364),
+        Parent = discordButton
+    })
+
+    -- Animations
+    discordButton.MouseEnter:Connect(function()
+        TweenService:Create(discordButton, self.Animations.ButtonHover, {
+            BackgroundColor3 = self.Colors.PrimaryDark,
+            Size = UDim2.new(0, 125, 0, 42)
+        }):Play()
+    end)
+
+    discordButton.MouseLeave:Connect(function()
+        TweenService:Create(discordButton, self.Animations.ButtonHover, {
+            BackgroundColor3 = self.Colors.Primary,
+            Size = UDim2.new(0, 120, 0, 40)
+        }):Play()
+    end)
+
+    discordButton.MouseButton1Click:Connect(function()
+        -- Copy to clipboard and show notification
+        if setclipboard then
+            setclipboard(self.DiscordInvite)
+            self:ShowNotification({
+                Title = "Discord",
+                Message = "Discord invite copied to clipboard!",
+                Type = "success"
+            })
+        else
+            self:ShowNotification({
+                Title = "Discord",
+                Message = "Join: " .. self.DiscordInvite,
+                Type = "info"
+            })
+        end
+    end)
+
+    table.insert(self.Components, discordButton)
+    return discordButton
+end
+
+-- Window Creation (Rayfield-style)
+function NexusUI:CreateWindow(options)
+    if self.KeySystemEnabled and not self.Verified then
+        if not self:CreateKeySystem() then
+            return nil
+        end
+    end
+
+    local window = {
+        Name = options.Name or "Nexus UI",
+        Tabs = {},
+        CurrentTab = nil
+    }
+
+    -- Create main window GUI
+    local screenGui = self:CreateElement("ScreenGui", {
+        Name = "NexusWindow",
+        DisplayOrder = 10,
+        Parent = self.Parent
+    })
+
+    local mainFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 600, 0, 400),
+        Position = UDim2.new(0.5, -300, 0.5, -200),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Darker,
+        Parent = screenGui
+    })
+
+    local corner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 12),
+        Parent = mainFrame
+    })
+
+    local stroke = self:CreateElement("UIStroke", {
+        Color = self.Colors.Primary,
+        Thickness = 2,
+        Parent = mainFrame
+    })
+
+    -- Top bar
+    local topBar = self:CreateElement("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = self.Colors.Dark,
+        Parent = mainFrame
+    })
+
+    local topBarCorner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 12, 0, 0),
+        Parent = topBar
+    })
+
+    local title = self:CreateElement("TextLabel", {
+        Size = UDim2.new(0, 200, 1, 0),
+        Position = UDim2.new(0, 15, 0, 0),
+        BackgroundTransparency = 1,
+        Text = window.Name,
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = topBar
+    })
+
+    -- Tab container
+    local tabContainer = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 150, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
+        BackgroundColor3 = self.Colors.Dark,
+        Parent = mainFrame
+    })
+
+    local tabList = self:CreateElement("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5),
+        Parent = tabContainer
+    })
+
+    -- Content area
+    local contentFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(1, -150, 1, -40),
+        Position = UDim2.new(0, 150, 0, 40),
+        BackgroundColor3 = self.Colors.Darker,
+        Parent = mainFrame
+    })
+
+    local contentCorner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 0, 0, 12),
+        Parent = contentFrame
+    })
+
+    local scrollingFrame = self:CreateElement("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = self.Colors.Gray,
+        Parent = contentFrame
+    })
+
+    local contentList = self:CreateElement("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10),
+        Parent = scrollingFrame
+    })
+
+    -- Window methods
+    function window:CreateTab(tabName, tabIcon)
+        local tab = {
+            Name = tabName,
+            Elements = {}
+        }
+
+        -- Tab button
+        local tabButton = self:CreateElement("TextButton", {
+            Size = UDim2.new(1, -10, 0, 40),
+            Position = UDim2.new(0, 5, 0, #window.Tabs * 45),
+            BackgroundColor3 = self.Colors.Dark,
+            TextColor3 = self.Colors.GrayLight,
+            Text = tabName,
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+            AutoButtonColor = false,
+            Parent = tabContainer
+        })
+
+        local tabCorner = self:CreateElement("UICorner", {
+            CornerRadius = UDim.new(0, 6),
+            Parent = tabButton
+        })
+
+        -- Tab content
+        local tabContent = self:CreateElement("Frame", {
+            Size = UDim2.new(1, -20, 0, 0),
+            BackgroundTransparency = 1,
+            Visible = false,
+            Parent = scrollingFrame
+        })
+
+        local tabContentList = self:CreateElement("UIListLayout", {
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+            Parent = tabContent
+        })
+
+        -- Select first tab by default
+        if #window.Tabs == 0 then
+            window.CurrentTab = tab
+            tabButton.BackgroundColor3 = self.Colors.Primary
+            tabButton.TextColor3 = self.Colors.Light
+            tabContent.Visible = true
+        end
+
+        -- Tab click handler
+        tabButton.MouseButton1Click:Connect(function()
+            if window.CurrentTab == tab then return end
+            
+            -- Update previous tab
+            if window.CurrentTab then
+                for _, btn in pairs(tabContainer:GetChildren()) do
+                    if btn:IsA("TextButton") and btn.Text == window.CurrentTab.Name then
+                        btn.BackgroundColor3 = self.Colors.Dark
+                        btn.TextColor3 = self.Colors.GrayLight
+                    end
+                end
+                window.CurrentTab.Content.Visible = false
+            end
+            
+            -- Set new current tab
+            window.CurrentTab = tab
+            tabButton.BackgroundColor3 = self.Colors.Primary
+            tabButton.TextColor3 = self.Colors.Light
+            tabContent.Visible = true
+        end)
+
+        tab.Button = tabButton
+        tab.Content = tabContent
+        table.insert(window.Tabs, tab)
+
+        -- Tab methods
+        function tab:CreateSection(sectionName)
+            local section = self:CreateElement("Frame", {
+                Size = UDim2.new(1, 0, 0, 30),
+                BackgroundTransparency = 1,
+                Parent = tabContent
+            })
+
+            local sectionLabel = self:CreateElement("TextLabel", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Text = sectionName:upper(),
+                TextColor3 = self.Colors.GrayLight,
+                Font = Enum.Font.GothamBold,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = section
+            })
+
+            return {
+                Label = sectionLabel
+            }
+        end
+
+        function tab:CreateButton(buttonOptions)
+            local button = self:CreateElement("TextButton", {
+                Size = UDim2.new(1, 0, 0, 40),
+                BackgroundColor3 = self.Colors.Dark,
+                TextColor3 = self.Colors.Light,
+                Text = buttonOptions.Name,
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                AutoButtonColor = false,
+                Parent = tabContent
+            })
+
+            local corner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(0, 6),
+                Parent = button
+            })
+
+            local stroke = self:CreateElement("UIStroke", {
+                Color = self.Colors.Gray,
+                Thickness = 1,
+                Parent = button
+            })
+
+            -- Animations
+            button.MouseEnter:Connect(function()
+                TweenService:Create(button, self.Animations.ButtonHover, {
+                    BackgroundColor3 = self.Colors.Primary
+                }):Play()
+            end)
+
+            button.MouseLeave:Connect(function()
+                TweenService:Create(button, self.Animations.ButtonHover, {
+                    BackgroundColor3 = self.Colors.Dark
+                }):Play()
+            end)
+
+            button.MouseButton1Click:Connect(function()
+                if buttonOptions.Callback then
+                    pcall(buttonOptions.Callback)
+                end
+            })
+
+            local buttonObj = {
+                Instance = button,
+                SetText = function(newText)
+                    button.Text = newText
+                end
+            }
+
+            table.insert(tab.Elements, buttonObj)
+            return buttonObj
+        end
+
+        function tab:CreateToggle(toggleOptions)
+            local toggleFrame = self:CreateElement("Frame", {
+                Size = UDim2.new(1, 0, 0, 40),
+                BackgroundColor3 = self.Colors.Dark,
+                Parent = tabContent
+            })
+
+            local corner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(0, 6),
+                Parent = toggleFrame
+            })
+
+            local stroke = self:CreateElement("UIStroke", {
+                Color = self.Colors.Gray,
+                Thickness = 1,
+                Parent = toggleFrame
+            })
+
+            local label = self:CreateElement("TextLabel", {
+                Size = UDim2.new(0.7, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Text = toggleOptions.Name,
+                TextColor3 = self.Colors.Light,
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = toggleFrame
+            })
+
+            local toggleButton = self:CreateElement("TextButton", {
+                Size = UDim2.new(0, 50, 0, 25),
+                Position = UDim2.new(1, -60, 0.5, -12.5),
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundColor3 = toggleOptions.Default and self.Colors.Success or self.Colors.Gray,
+                Text = "",
+                AutoButtonColor = false,
+                Parent = toggleFrame
+            })
+
+            local toggleCorner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(1, 0),
+                Parent = toggleButton
+            })
+
+            local toggleKnob = self:CreateElement("Frame", {
+                Size = UDim2.new(0, 19, 0, 19),
+                Position = toggleOptions.Default and UDim2.new(1, -22, 0.5, -9.5) or UDim2.new(0, 3, 0.5, -9.5),
+                AnchorPoint = Vector2.new(1, 0.5),
+                BackgroundColor3 = self.Colors.Light,
+                Parent = toggleButton
+            })
+
+            local knobCorner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(1, 0),
+                Parent = toggleKnob
+            })
+
+            local isToggled = toggleOptions.Default or false
+
+            local function updateToggle()
+                local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                
+                if isToggled then
+                    TweenService:Create(toggleButton, tweenInfo, {
+                        BackgroundColor3 = self.Colors.Success
+                    }):Play()
+                    TweenService:Create(toggleKnob, tweenInfo, {
+                        Position = UDim2.new(1, -22, 0.5, -9.5)
+                    }):Play()
+                else
+                    TweenService:Create(toggleButton, tweenInfo, {
+                        BackgroundColor3 = self.Colors.Gray
+                    }):Play()
+                    TweenService:Create(toggleKnob, tweenInfo, {
+                        Position = UDim2.new(0, 3, 0.5, -9.5)
+                    }):Play()
+                end
+                
+                if toggleOptions.Callback then
+                    pcall(toggleOptions.Callback, isToggled)
+                end
+            end
+
+            toggleButton.MouseButton1Click:Connect(function()
+                isToggled = not isToggled
+                updateToggle()
+            end)
+
+            local toggleObj = {
+                Instance = toggleFrame,
+                SetValue = function(value)
+                    isToggled = value
+                    updateToggle()
+                end,
+                GetValue = function()
+                    return isToggled
+                end
+            }
+
+            table.insert(tab.Elements, toggleObj)
+            return toggleObj
+        end
+
+        function tab:CreateSlider(sliderOptions)
+            local sliderFrame = self:CreateElement("Frame", {
+                Size = UDim2.new(1, 0, 0, 60),
+                BackgroundColor3 = self.Colors.Dark,
+                Parent = tabContent
+            })
+
+            local corner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(0, 6),
+                Parent = sliderFrame
+            })
+
+            local stroke = self:CreateElement("UIStroke", {
+                Color = self.Colors.Gray,
+                Thickness = 1,
+                Parent = sliderFrame
+            })
+
+            local label = self:CreateElement("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 20),
+                Position = UDim2.new(0, 10, 0, 5),
+                BackgroundTransparency = 1,
+                Text = sliderOptions.Name,
+                TextColor3 = self.Colors.Light,
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = sliderFrame
+            })
+
+            local valueLabel = self:CreateElement("TextLabel", {
+                Size = UDim2.new(0, 60, 0, 20),
+                Position = UDim2.new(1, -70, 0, 5),
+                BackgroundTransparency = 1,
+                Text = tostring(sliderOptions.Default or 50),
+                TextColor3 = self.Colors.GrayLight,
+                Font = Enum.Font.Gotham,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                Parent = sliderFrame
+            })
+
+            local track = self:CreateElement("Frame", {
+                Size = UDim2.new(1, -20, 0, 6),
+                Position = UDim2.new(0, 10, 1, -25),
+                BackgroundColor3 = self.Colors.Gray,
+                Parent = sliderFrame
+            })
+
+            local trackCorner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(1, 0),
+                Parent = track
+            })
+
+            local fill = self:CreateElement("Frame", {
+                Size = UDim2.new((sliderOptions.Default or 50) / 100, 0, 1, 0),
+                BackgroundColor3 = self.Colors.Primary,
+                Parent = track
+            })
+
+            local fillCorner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(1, 0),
+                Parent = fill
+            })
+
+            local knob = self:CreateElement("Frame", {
+                Size = UDim2.new(0, 16, 0, 16),
+                Position = UDim2.new(fill.Size.X.Scale, -8, 0.5, -8),
+                BackgroundColor3 = self.Colors.Light,
+                Parent = track
+            })
+
+            local knobCorner = self:CreateElement("UICorner", {
+                CornerRadius = UDim.new(1, 0),
+                Parent = knob
+            })
+
+            local isDragging = false
+            local minValue = sliderOptions.Min or 0
+            local maxValue = sliderOptions.Max or 100
+            local currentValue = sliderOptions.Default or 50
+
+            local function updateSlider(value)
+                currentValue = math.clamp(value, minValue, maxValue)
+                local normalized = (currentValue - minValue) / (maxValue - minValue)
+                
+                fill.Size = UDim2.new(normalized, 0, 1, 0)
+                knob.Position = UDim2.new(normalized, -8, 0.5, -8)
+                valueLabel.Text = tostring(math.floor(currentValue))
+                
+                if sliderOptions.Callback then
+                    pcall(sliderOptions.Callback, currentValue)
+                end
+            end
+
+            -- Input handling
+            knob.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDragging = true
+                end
+            end)
+
+            knob.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDragging = false
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local mousePos = Players.LocalPlayer:GetMouse()
+                    local relativeX = (mousePos.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+                    local value = minValue + (relativeX * (maxValue - minValue))
+                    updateSlider(value)
+                end
+            end)
+
+            local sliderObj = {
+                Instance = sliderFrame,
+                SetValue = function(value)
+                    updateSlider(value)
+                end,
+                GetValue = function()
+                    return currentValue
+                end
+            }
+
+            table.insert(tab.Elements, sliderObj)
+            return sliderObj
+        end
+
+        return tab
+    end
+
+    -- Add Discord button if enabled
+    if options.Discord then
+        self:CreateDiscordButton({
+            Parent = screenGui,
+            Position = UDim2.new(1, -130, 1, -50)
+        })
+    end
+
+    window.GUI = screenGui
+    table.insert(self.Windows, window)
+    self.CurrentWindow = window
+
+    return window
+end
+
+-- Notification System
+function NexusUI:ShowNotification(options)
+    local notification = self:CreateElement("Frame", {
+        Name = "Notification",
+        Size = UDim2.new(0, 350, 0, 80),
+        Position = UDim2.new(1, 400, 0.1, 0),
+        AnchorPoint = Vector2.new(1, 0),
+        BackgroundColor3 = self.Colors.Dark,
+        Parent = self.Parent
+    })
+
+    local corner = self:CreateElement("UICorner", {
+        CornerRadius = UDim.new(0, 12),
+        Parent = notification
+    })
+
+    local stroke = self:CreateElement("UIStroke", {
+        Color = options.Type == "error" and self.Colors.Error 
+               or options.Type == "success" and self.Colors.Success 
+               or options.Type == "warning" and self.Colors.Warning 
+               or self.Colors.Primary,
+        Thickness = 2,
+        Parent = notification
+    })
+
+    local icon = self:CreateElement("TextLabel", {
+        Size = UDim2.new(0, 40, 0, 40),
+        Position = UDim2.new(0, 20, 0.5, -20),
+        AnchorPoint = Vector2.new(0, 0.5),
+        BackgroundTransparency = 1,
+        Text = options.Type == "error" and "❌" 
+              or options.Type == "success" and "✅" 
+              or options.Type == "warning" and "⚠️" 
+              or "ℹ️",
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = 20,
+        Parent = notification
+    })
+
+    local title = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, -80, 0, 25),
+        Position = UDim2.new(0, 70, 0, 15),
+        BackgroundTransparency = 1,
+        Text = options.Title or "Notification",
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = notification
+    })
+
+    local message = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, -80, 0, 35),
+        Position = UDim2.new(0, 70, 0, 40),
+        BackgroundTransparency = 1,
+        Text = options.Message or "",
+        TextColor3 = self.Colors.GrayLight,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+        Parent = notification
+    })
+
+    -- Animate in
+    local slideIn = TweenService:Create(notification, self.Animations.SlideIn, {
+        Position = UDim2.new(1, -20, 0.1, 0)
+    })
+    slideIn:Play()
+
+    -- Auto remove after delay
+    local duration = options.Duration or 5
+    task.delay(duration, function()
+        if notification and notification.Parent then
+            local slideOut = TweenService:Create(notification, self.Animations.SlideIn, {
+                Position = UDim2.new(1, 400, 0.1, 0)
+            })
+            slideOut:Play()
+            slideOut.Completed:Wait()
+            notification:Destroy()
+        end
+    end)
+
+    table.insert(self.Components, notification)
+    return notification
+end
+
+-- Cleanup method
+function NexusUI:Destroy()
+    for _, component in ipairs(self.Components) do
+        if component and component.Parent then
+            component:Destroy()
+        end
+    end
+    for _, window in ipairs(self.Windows) do
+        if window.GUI and window.GUI.Parent then
+            window.GUI:Destroy()
+        end
+    end
+    self.Components = {}
+    self.Windows = {}
+end
+
+-- Make library available globally
+getgenv().NexusUI = NexusUI
+
+return NexusUI
