@@ -1,4 +1,4 @@
--- NexusUI Library
+-- Nexus UI Library with Key System & Draggable UI
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -15,12 +15,12 @@ NexusUI.Colors = {
     Dark = Color3.fromRGB(30, 41, 59),
     Darker = Color3.fromRGB(15, 23, 42),
     Light = Color3.fromRGB(248, 250, 252),
-    Gray = Color3.fromRGB(100, 116, 139),
+    GrayLight = Color3.fromRGB(203, 213, 225),
     Success = Color3.fromRGB(16, 185, 129),
     Error = Color3.fromRGB(239, 68, 68)
 }
 
--- Tween presets
+-- Animations
 NexusUI.Animations = {
     ButtonHover = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
     ButtonClick = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -31,33 +31,30 @@ NexusUI.Animations = {
 -- Init
 function NexusUI:Init(options)
     local self = setmetatable({}, NexusUI)
+    self.options = options or {}
     self.Parent = CoreGui
     self.Components = {}
     self.Windows = {}
     self.Verified = false
     self.KeySystemEnabled = options.KeySystem or false
-    self.DiscordInvite = options.DiscordInvite or "https://discord.gg/example"
-    self.Keys = options.Keys or {"NEXUS-TEST-123", "NEXUS-DEV-001"}
+    self.Keys = options.Keys or {"NEXUS-KEY-123"}
+    self.GetKeyLink = options.GetKeyLink or "https://example.com/getkey"
     return self
 end
 
--- Utility
-function NexusUI:CreateElement(className, properties)
-    local element = Instance.new(className)
-    for prop, val in pairs(properties) do
-        element[prop] = val
+-- Utility to create elements
+function NexusUI:CreateElement(className, props)
+    local e = Instance.new(className)
+    for k,v in pairs(props or {}) do
+        e[k] = v
     end
-    return element
+    return e
 end
 
 -- Validate key
 function NexusUI:ValidateKey(key)
-    if not self.KeySystemEnabled then
-        self.Verified = true
-        return true
-    end
-    for _, validKey in pairs(self.Keys) do
-        if key == validKey then
+    for _,k in ipairs(self.Keys) do
+        if key == k then
             self.Verified = true
             return true
         end
@@ -65,129 +62,118 @@ function NexusUI:ValidateKey(key)
     return false
 end
 
--- Key system GUI
+-- Key System GUI
 function NexusUI:CreateKeySystem(getKeyLink)
-    local screenGui = self:CreateElement("ScreenGui", {Name = "NexusKeySystem", Parent = self.Parent})
-
-    local mainFrame = self:CreateElement("Frame", {
-        Size = UDim2.new(0, 400, 0, 250),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = self.Colors.Darker,
-        Parent = screenGui
+    getKeyLink = getKeyLink or self.GetKeyLink
+    local gui = self:CreateElement("ScreenGui",{Parent=self.Parent, Name="NexusKeySystem"})
+    local frame = self:CreateElement("Frame",{
+        Size=UDim2.new(0,400,0,200),
+        Position=UDim2.new(0.5,0,0.5,0),
+        AnchorPoint=Vector2.new(0.5,0.5),
+        BackgroundColor3=self.Colors.Darker,
+        Parent=gui
+    })
+    local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,12),Parent=frame})
+    local title = self:CreateElement("TextLabel",{
+        Size=UDim2.new(1,0,0,50),
+        Text="NEXUS UI - ENTER KEY",
+        TextColor3=self.Colors.Light,
+        Font=Enum.Font.GothamBold,
+        TextSize=24,
+        BackgroundTransparency=1,
+        Parent=frame
+    })
+    local keyBox = self:CreateElement("TextBox",{
+        Size=UDim2.new(0,300,0,40),
+        Position=UDim2.new(0.5,0,0.5,-20),
+        AnchorPoint=Vector2.new(0.5,0.5),
+        BackgroundColor3=self.Colors.Dark,
+        TextColor3=self.Colors.Light,
+        PlaceholderText="Enter key...",
+        Font=Enum.Font.Gotham,
+        TextSize=16,
+        Parent=frame
+    })
+    local submit = self:CreateElement("TextButton",{
+        Size=UDim2.new(0,120,0,40),
+        Position=UDim2.new(0.5,0,0.7,0),
+        AnchorPoint=Vector2.new(0.5,0.5),
+        BackgroundColor3=self.Colors.Primary,
+        Text="SUBMIT",
+        TextColor3=self.Colors.Light,
+        Font=Enum.Font.GothamBold,
+        TextSize=16,
+        Parent=frame
+    })
+    local getBtn = self:CreateElement("TextButton",{
+        Size=UDim2.new(0,120,0,40),
+        Position=UDim2.new(0.5,0,0.85,0),
+        AnchorPoint=Vector2.new(0.5,0.5),
+        BackgroundColor3=self.Colors.GrayLight,
+        Text="GET KEY",
+        TextColor3=self.Colors.Dark,
+        Font=Enum.Font.GothamBold,
+        TextSize=16,
+        Parent=frame
     })
 
-    local corner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 16), Parent = mainFrame})
-
-    local title = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 50),
-        BackgroundTransparency = 1,
-        Text = "NEXUS UI - KEY SYSTEM",
-        TextColor3 = self.Colors.Light,
-        Font = Enum.Font.GothamBold,
-        TextSize = 24,
-        Parent = mainFrame
-    })
-
-    local subtitle = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, -40, 0, 30),
-        Position = UDim2.new(0, 20, 0, 60),
-        BackgroundTransparency = 1,
-        Text = "Enter your premium key to continue",
-        TextColor3 = self.Colors.Gray,
-        Font = Enum.Font.Gotham,
-        TextSize = 16,
-        TextWrapped = true,
-        Parent = mainFrame
-    })
-
-    local keyBox = self:CreateElement("TextBox", {
-        Size = UDim2.new(0, 300, 0, 40),
-        Position = UDim2.new(0.5, 0, 0.5, -20),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = self.Colors.Dark,
-        TextColor3 = self.Colors.Light,
-        PlaceholderText = "Enter your key here...",
-        Font = Enum.Font.Gotham,
-        TextSize = 16,
-        Parent = mainFrame
-    })
-
-    local submitButton = self:CreateElement("TextButton", {
-        Size = UDim2.new(0, 150, 0, 40),
-        Position = UDim2.new(0.5, -80, 0.7, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = self.Colors.Primary,
-        TextColor3 = self.Colors.Light,
-        Text = "SUBMIT",
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 16,
-        AutoButtonColor = false,
-        Parent = mainFrame
-    })
-
-    local getKeyButton = self:CreateElement("TextButton", {
-        Size = UDim2.new(0, 150, 0, 40),
-        Position = UDim2.new(0.5, 80, 0.7, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = self.Colors.Gray,
-        TextColor3 = self.Colors.Light,
-        Text = "GET KEY",
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 16,
-        AutoButtonColor = false,
-        Parent = mainFrame
-    })
-
-    local resultLabel = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, -40, 0, 30),
-        Position = UDim2.new(0, 20, 0, 200),
-        BackgroundTransparency = 1,
-        Text = "",
-        TextColor3 = self.Colors.Error,
-        Font = Enum.Font.Gotham,
-        TextSize = 14,
-        TextWrapped = true,
-        Visible = false,
-        Parent = mainFrame
-    })
-
-    -- Submit key
-    local function submitKey()
-        local key = keyBox.Text
-        if self:ValidateKey(key) then
-            resultLabel.Text = "✅ Key validated!"
-            resultLabel.TextColor3 = self.Colors.Success
-            resultLabel.Visible = true
-            task.wait(0.5)
-            screenGui:Destroy()
-            return true
+    submit.MouseButton1Click:Connect(function()
+        if self:ValidateKey(keyBox.Text) then
+            gui:Destroy()
         else
-            resultLabel.Text = "❌ Invalid key!"
-            resultLabel.TextColor3 = self.Colors.Error
-            resultLabel.Visible = true
-        end
-        return false
-    end
-
-    submitButton.MouseButton1Click:Connect(submitKey)
-    keyBox.FocusLost:Connect(function(enter)
-        if enter then submitKey() end
-    end)
-
-    -- GET KEY button
-    getKeyButton.MouseButton1Click:Connect(function()
-        if getKeyLink then
-            if setclipboard then
-                setclipboard(getKeyLink)
-            end
-            print("GET KEY LINK: "..getKeyLink)
+            keyBox.Text = ""
+            keyBox.PlaceholderText = "INVALID KEY"
+            keyBox.TextColor3 = self.Colors.Error
         end
     end)
 
-    table.insert(self.Components, screenGui)
+    getBtn.MouseButton1Click:Connect(function()
+        setclipboard(getKeyLink)
+    end)
+
+    table.insert(self.Components, gui)
 end
 
--- Make global
+-- Create Main Window
+function NexusUI:CreateWindow(options)
+    if self.KeySystemEnabled and not self.Verified then
+        self:CreateKeySystem()
+        return
+    end
+
+    local window = {Tabs={}}
+    local gui = self:CreateElement("ScreenGui",{Parent=self.Parent, Name=options.Name or "NexusUI"})
+    local frame = self:CreateElement("Frame",{
+        Size=UDim2.new(0,600,0,400),
+        Position=UDim2.new(0.5,0,0.5,0),
+        AnchorPoint=Vector2.new(0.5,0.5),
+        BackgroundColor3=self.Colors.Darker,
+        Parent=gui
+    })
+
+    frame.Active = true
+    frame.Draggable = true
+
+    -- Close button
+    local closeBtn = self:CreateElement("TextButton",{
+        Size=UDim2.new(0,30,0,30),
+        Position=UDim2.new(1,-35,0,5),
+        BackgroundColor3=self.Colors.Error,
+        Text="X",
+        TextColor3=self.Colors.Light,
+        Font=Enum.Font.GothamBold,
+        TextSize=20,
+        Parent=frame
+    })
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+
+    window.GUI = gui
+    table.insert(self.Windows, window)
+    return window
+end
+
+-- Make library global
 getgenv().NexusUI = NexusUI
 return NexusUI
