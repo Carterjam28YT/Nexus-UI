@@ -1,4 +1,4 @@
--- Nexus UI Library with Key System & Draggable UI
+-- Nexus UI Library (Modified)
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -8,15 +8,18 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 
--- Colors
+-- Color palette
 NexusUI.Colors = {
     Primary = Color3.fromRGB(99, 102, 241),
     PrimaryDark = Color3.fromRGB(79, 70, 229),
+    Secondary = Color3.fromRGB(244, 63, 94),
     Dark = Color3.fromRGB(30, 41, 59),
     Darker = Color3.fromRGB(15, 23, 42),
     Light = Color3.fromRGB(248, 250, 252),
+    Gray = Color3.fromRGB(100, 116, 139),
     GrayLight = Color3.fromRGB(203, 213, 225),
     Success = Color3.fromRGB(16, 185, 129),
+    Warning = Color3.fromRGB(245, 158, 11),
     Error = Color3.fromRGB(239, 68, 68)
 }
 
@@ -37,23 +40,27 @@ function NexusUI:Init(options)
     self.Windows = {}
     self.Verified = false
     self.KeySystemEnabled = options.KeySystem or false
-    self.Keys = options.Keys or {"NEXUS-KEY-123"}
+    self.Keys = options.Keys or {}
     self.GetKeyLink = options.GetKeyLink or "https://example.com/getkey"
     return self
 end
 
--- Utility to create elements
-function NexusUI:CreateElement(className, props)
-    local e = Instance.new(className)
-    for k,v in pairs(props or {}) do
-        e[k] = v
+-- Utility
+function NexusUI:CreateElement(className, properties)
+    local element = Instance.new(className)
+    for property, value in pairs(properties) do
+        element[property] = value
     end
-    return e
+    return element
 end
 
--- Validate key
+-- Key Validation
 function NexusUI:ValidateKey(key)
-    for _,k in ipairs(self.Keys) do
+    if not self.KeySystemEnabled then
+        self.Verified = true
+        return true
+    end
+    for _, k in ipairs(self.Keys) do
         if key == k then
             self.Verified = true
             return true
@@ -62,115 +69,202 @@ function NexusUI:ValidateKey(key)
     return false
 end
 
--- Key System GUI
-function NexusUI:CreateKeySystem(getKeyLink)
-    getKeyLink = getKeyLink or self.GetKeyLink
-    local gui = self:CreateElement("ScreenGui",{Parent=self.Parent, Name="NexusKeySystem"})
-    local frame = self:CreateElement("Frame",{
-        Size=UDim2.new(0,400,0,200),
-        Position=UDim2.new(0.5,0,0.5,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Darker,
-        Parent=gui
-    })
-    local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,12),Parent=frame})
-    local title = self:CreateElement("TextLabel",{
-        Size=UDim2.new(1,0,0,50),
-        Text="NEXUS UI - ENTER KEY",
-        TextColor3=self.Colors.Light,
-        Font=Enum.Font.GothamBold,
-        TextSize=24,
-        BackgroundTransparency=1,
-        Parent=frame
-    })
-    local keyBox = self:CreateElement("TextBox",{
-        Size=UDim2.new(0,300,0,40),
-        Position=UDim2.new(0.5,0,0.5,-20),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Dark,
-        TextColor3=self.Colors.Light,
-        PlaceholderText="Enter key...",
-        Font=Enum.Font.Gotham,
-        TextSize=16,
-        Parent=frame
-    })
-    local submit = self:CreateElement("TextButton",{
-        Size=UDim2.new(0,120,0,40),
-        Position=UDim2.new(0.5,0,0.7,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Primary,
-        Text="SUBMIT",
-        TextColor3=self.Colors.Light,
-        Font=Enum.Font.GothamBold,
-        TextSize=16,
-        Parent=frame
-    })
-    local getBtn = self:CreateElement("TextButton",{
-        Size=UDim2.new(0,120,0,40),
-        Position=UDim2.new(0.5,0,0.85,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.GrayLight,
-        Text="GET KEY",
-        TextColor3=self.Colors.Dark,
-        Font=Enum.Font.GothamBold,
-        TextSize=16,
-        Parent=frame
+-- Key System UI
+function NexusUI:CreateKeySystem()
+    local gui = self:CreateElement("ScreenGui", {
+        Name = "NexusKeySystem",
+        DisplayOrder = 999,
+        Parent = self.Parent
     })
 
-    submit.MouseButton1Click:Connect(function()
-        if self:ValidateKey(keyBox.Text) then
-            gui:Destroy()
-        else
-            keyBox.Text = ""
-            keyBox.PlaceholderText = "INVALID KEY"
-            keyBox.TextColor3 = self.Colors.Error
+    local mainFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 400, 0, 250),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Darker,
+        Parent = gui
+    })
+    local corner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 16), Parent = mainFrame})
+
+    local title = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 60),
+        BackgroundTransparency = 1,
+        Text = "ENTER KEY",
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = 24,
+        Parent = mainFrame
+    })
+
+    local keyBox = self:CreateElement("TextBox", {
+        Size = UDim2.new(0, 300, 0, 45),
+        Position = UDim2.new(0.5, -150, 0.5, -10),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Dark,
+        TextColor3 = self.Colors.Light,
+        PlaceholderText = "Enter your key...",
+        Font = Enum.Font.Gotham,
+        TextSize = 16,
+        Text = "",
+        Parent = mainFrame
+    })
+    local keyCorner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8), Parent = keyBox})
+
+    local submit = self:CreateElement("TextButton", {
+        Size = UDim2.new(0, 200, 0, 40),
+        Position = UDim2.new(0.5, -100, 0.7, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Primary,
+        TextColor3 = self.Colors.Light,
+        Text = "SUBMIT",
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 16,
+        Parent = mainFrame
+    })
+    local submitCorner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8), Parent = submit})
+
+    local getKeyButton = self:CreateElement("TextButton", {
+        Size = UDim2.new(0, 120, 0, 30),
+        Position = UDim2.new(0.5, -60, 0.85, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Secondary,
+        TextColor3 = self.Colors.Light,
+        Text = "GET KEY",
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        Parent = mainFrame
+    })
+    local getCorner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 6), Parent = getKeyButton})
+
+    getKeyButton.MouseButton1Click:Connect(function()
+        if self.GetKeyLink then
+            if setclipboard then setclipboard(self.GetKeyLink) end
         end
     end)
 
-    getBtn.MouseButton1Click:Connect(function()
-        setclipboard(getKeyLink)
+    local resultLabel = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, 200),
+        BackgroundTransparency = 1,
+        Text = "",
+        TextColor3 = self.Colors.Error,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextWrapped = true,
+        Parent = mainFrame
+    })
+
+    local function submitKey()
+        local key = keyBox.Text
+        if self:ValidateKey(key) then
+            resultLabel.Text = "✅ Key validated!"
+            resultLabel.TextColor3 = self.Colors.Success
+            task.wait(0.5)
+            gui:Destroy()
+            return true
+        else
+            resultLabel.Text = "❌ Invalid key!"
+            resultLabel.TextColor3 = self.Colors.Error
+        end
+    end
+
+    submit.MouseButton1Click:Connect(submitKey)
+    keyBox.FocusLost:Connect(function(enter)
+        if enter then submitKey() end
+    end)
+
+    -- Draggable frame
+    local dragging = false
+    local dragInput, mousePos, framePos
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            mousePos = input.Position
+            framePos = mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    mainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            mainFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
     end)
 
     table.insert(self.Components, gui)
+    return gui
 end
 
--- Create Main Window
+-- Example Window creation (will only show after key validated)
 function NexusUI:CreateWindow(options)
     if self.KeySystemEnabled and not self.Verified then
         self:CreateKeySystem()
-        return
+        repeat task.wait() until self.Verified
     end
 
-    local window = {Tabs={}}
-    local gui = self:CreateElement("ScreenGui",{Parent=self.Parent, Name=options.Name or "NexusUI"})
-    local frame = self:CreateElement("Frame",{
-        Size=UDim2.new(0,600,0,400),
-        Position=UDim2.new(0.5,0,0.5,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Darker,
-        Parent=gui
-    })
+    local window = {
+        Name = options.Name or "Nexus UI",
+        Tabs = {},
+    }
 
-    frame.Active = true
-    frame.Draggable = true
+    -- Main window
+    local screenGui = self:CreateElement("ScreenGui", {Name = "NexusWindow", DisplayOrder = 10, Parent = self.Parent})
+    local mainFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 600, 0, 400),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = self.Colors.Darker,
+        Parent = screenGui
+    })
+    local corner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 12), Parent = mainFrame})
 
     -- Close button
-    local closeBtn = self:CreateElement("TextButton",{
-        Size=UDim2.new(0,30,0,30),
-        Position=UDim2.new(1,-35,0,5),
-        BackgroundColor3=self.Colors.Error,
-        Text="X",
-        TextColor3=self.Colors.Light,
-        Font=Enum.Font.GothamBold,
-        TextSize=20,
-        Parent=frame
+    local closeButton = self:CreateElement("TextButton", {
+        Size = UDim2.new(0, 25, 0, 25),
+        Position = UDim2.new(1, -30, 0, 5),
+        BackgroundColor3 = self.Colors.Error,
+        TextColor3 = self.Colors.Light,
+        Text = "X",
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        AutoButtonColor = false,
+        Parent = mainFrame
     })
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
+    local closeCorner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 6), Parent = closeButton})
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
     end)
 
-    window.GUI = gui
+    -- Draggable
+    local dragging = false
+    local dragInput, mousePos, framePos
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            mousePos = input.Position
+            framePos = mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    mainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            mainFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
+    end)
+
     table.insert(self.Windows, window)
+    window.GUI = screenGui
     return window
 end
 
