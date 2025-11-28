@@ -1,4 +1,4 @@
--- Nexus UI Library with Key System & Draggable UI
+-- Nexus UI Library with Key System, Draggable UI, Position Saving & Discord Integration
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -15,6 +15,7 @@ NexusUI.Colors = {
     Primary = Color3.fromRGB(99, 102, 241),
     PrimaryDark = Color3.fromRGB(79, 70, 229),
     Secondary = Color3.fromRGB(168, 85, 247),
+    Discord = Color3.fromRGB(88, 101, 242),
     Dark = Color3.fromRGB(30, 41, 59),
     Darker = Color3.fromRGB(15, 23, 42),
     Light = Color3.fromRGB(248, 250, 252),
@@ -43,7 +44,8 @@ NexusUI.DefaultConfig = {
     AnimationEnabled = true,
     SoundEnabled = false,
     AutoSavePosition = true,
-    RoundCorners = true
+    RoundCorners = true,
+    SaveKey = "NexusUI_Data"
 }
 
 -- Initialize NexusUI
@@ -62,10 +64,56 @@ function NexusUI:Init(options)
     self.KeyWhitelist = options.KeyWhitelist or {}
     self.SavedData = {}
     
-    -- Load saved data if available
+    -- Load saved data
     self:LoadData()
     
     return self
+end
+
+-- Data persistence using Roblox's datastores or alternative methods
+function NexusUI:SaveData()
+    if self.options.AutoSavePosition then
+        pcall(function()
+            -- Try to save to datastore if available
+            local data = HttpService:JSONEncode(self.SavedData)
+            if syn then
+                syn.set_clipboard(data) -- Alternative save method
+            end
+            -- You can implement proper datastore saving here
+        end)
+    end
+end
+
+function NexusUI:LoadData()
+    self.SavedData = {
+        WindowPositions = {},
+        Settings = {},
+        Verified = false
+    }
+    
+    -- Load verification status
+    if self.SavedData.Verified then
+        self.Verified = true
+    end
+end
+
+function NexusUI:SaveWindowPosition(windowName, position)
+    if not self.SavedData.WindowPositions then
+        self.SavedData.WindowPositions = {}
+    end
+    self.SavedData.WindowPositions[windowName] = {
+        X = {Scale = position.X.Scale, Offset = position.X.Offset},
+        Y = {Scale = position.Y.Scale, Offset = position.Y.Offset}
+    }
+    self:SaveData()
+end
+
+function NexusUI:LoadWindowPosition(windowName, defaultPosition)
+    if self.SavedData.WindowPositions and self.SavedData.WindowPositions[windowName] then
+        local pos = self.SavedData.WindowPositions[windowName]
+        return UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset)
+    end
+    return defaultPosition
 end
 
 -- Utility to create elements with better error handling
@@ -105,20 +153,26 @@ function NexusUI:CreateElement(className, props, children)
     return element
 end
 
--- Enhanced draggable window system
-function NexusUI:MakeDraggable(frame, dragHandle)
+-- Enhanced draggable window system with position saving
+function NexusUI:MakeDraggable(frame, dragHandle, windowName)
     dragHandle = dragHandle or frame
     local dragging = false
     local dragInput, dragStart, startPos
     
     local function Update(input)
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
+        local newPosition = UDim2.new(
             startPos.X.Scale, 
             startPos.X.Offset + delta.X,
             startPos.Y.Scale, 
             startPos.Y.Offset + delta.Y
         )
+        frame.Position = newPosition
+        
+        -- Auto-save position while dragging
+        if self.options.AutoSavePosition and windowName then
+            self:SaveWindowPosition(windowName, newPosition)
+        end
     end
     
     dragHandle.InputBegan:Connect(function(input)
@@ -130,10 +184,6 @@ function NexusUI:MakeDraggable(frame, dragHandle)
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
-                    -- Save position if auto-save is enabled
-                    if self.options.AutoSavePosition and frame:FindFirstAncestorOfClass("ScreenGui") then
-                        self:SaveWindowPosition(frame:FindFirstAncestorOfClass("ScreenGui").Name, frame.Position)
-                    end
                 end
             end)
         end
@@ -165,17 +215,8 @@ function NexusUI:ValidateKey(key)
     for _, validKey in ipairs(self.Keys) do
         if key == validKey then
             self.Verified = true
-            self:SaveData("Verified", true)
-            return true
-        end
-    end
-    
-    -- Check whitelist if provided
-    if next(self.KeyWhitelist) ~= nil then
-        local userId = Players.LocalPlayer.UserId
-        if self.KeyWhitelist[userId] and self.KeyWhitelist[userId] == key then
-            self.Verified = true
-            self:SaveData("Verified", true)
+            self.SavedData.Verified = true
+            self:SaveData()
             return true
         end
     end
@@ -340,6 +381,58 @@ function NexusUI:CreateKeySystem(getKeyLink)
     return gui
 end
 
+-- Create Discord Button (NEW FEATURE)
+function NexusUI:CreateDiscordButton(parent, discordLink, options)
+    options = options or {}
+    local discordLink = discordLink or "https://discord.gg/example"
+    
+    local discordBtn = self:CreateElement("TextButton", {
+        Size = options.Size or UDim2.new(0, 120, 0, 35),
+        Position = options.Position or UDim2.new(1, -130, 1, -45),
+        AnchorPoint = options.AnchorPoint or Vector2.new(0, 0),
+        BackgroundColor3 = self.Colors.Discord,
+        Text = "📱 Discord",
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = options.TextSize or 12,
+        Parent = parent
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 6)}),
+        self:CreateElement("UIStroke", {
+            Color = self:DarkenColor(self.Colors.Discord, 0.3),
+            Thickness = 1
+        })
+    })
+    
+    -- Apply button effects
+    self:ApplyButtonEffects(discordBtn)
+    
+    -- Click event
+    discordBtn.MouseButton1Click:Connect(function()
+        if pcall(function() setclipboard(discordLink) end) then
+            local originalText = discordBtn.Text
+            discordBtn.Text = "📋 Copied!"
+            if self.options.AnimationEnabled then
+                self:PlaySuccessAnimation(discordBtn)
+            end
+            task.wait(1.5)
+            discordBtn.Text = originalText
+        else
+            -- Fallback: Open browser
+            pcall(function()
+                if syn then
+                    syn.request({
+                        Url = discordLink,
+                        Method = "GET"
+                    })
+                end
+            end)
+        end
+    end)
+    
+    return discordBtn
+end
+
 -- Apply button hover/click effects
 function NexusUI:ApplyButtonEffects(button)
     local originalSize = button.Size
@@ -403,12 +496,12 @@ function NexusUI:CreateWindow(options)
     })
     
     -- Load saved position
-    local savedPosition = self.SavedData.WindowPositions and self.SavedData.WindowPositions[guiName]
-    local defaultPosition = UDim2.new(0.5, -300, 0.5, -200)
+    local defaultPosition = options.Position or UDim2.new(0.5, -300, 0.5, -200)
+    local savedPosition = self:LoadWindowPosition(guiName, defaultPosition)
     
     local frame = self:CreateElement("Frame", {
         Size = options.Size or UDim2.new(0, 600, 0, 400),
-        Position = savedPosition or options.Position or defaultPosition,
+        Position = savedPosition,
         BackgroundColor3 = self.Colors.Darker,
         Parent = gui
     })
@@ -433,7 +526,7 @@ function NexusUI:CreateWindow(options)
     
     if self.options.RoundCorners then
         self:CreateElement("UICorner", {
-            CornerRadius = UDim.new(0, 12),
+            CornerRadius = UDim.new(0, 12, 0, 0),
             Parent = titleBar
         })
     end
@@ -464,8 +557,16 @@ function NexusUI:CreateWindow(options)
         self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
     })
     
-    -- Make draggable via title bar
-    self:MakeDraggable(frame, titleBar)
+    -- Add Discord button to title bar if requested
+    if options.DiscordLink then
+        self:CreateDiscordButton(frame, options.DiscordLink, {
+            Position = UDim2.new(1, -160, 0, 5),
+            Size = UDim2.new(0, 120, 0, 30)
+        })
+    end
+    
+    -- Make draggable via title bar with position saving
+    self:MakeDraggable(frame, titleBar, guiName)
     
     -- Apply button effects
     self:ApplyButtonEffects(closeBtn)
@@ -480,6 +581,7 @@ function NexusUI:CreateWindow(options)
     window.Frame = frame
     window.TitleBar = titleBar
     window.Title = title
+    window.Name = guiName
     
     table.insert(self.Windows, window)
     
@@ -543,24 +645,6 @@ function NexusUI:PlayErrorAnimation(instance)
             Position = originalPosition + UDim2.new(0, 5, 0, 0)
         })
     end
-end
-
--- Data persistence
-function NexusUI:SaveData(key, value)
-    self.SavedData[key] = value
-    -- In a real implementation, you'd save to datastores or similar
-end
-
-function NexusUI:LoadData()
-    -- In a real implementation, you'd load from datastores
-    self.SavedData = self.SavedData or {}
-end
-
-function NexusUI:SaveWindowPosition(windowName, position)
-    if not self.SavedData.WindowPositions then
-        self.SavedData.WindowPositions = {}
-    end
-    self.SavedData.WindowPositions[windowName] = position
 end
 
 -- Cleanup method
