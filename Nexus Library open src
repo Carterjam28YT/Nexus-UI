@@ -1,4 +1,4 @@
--- Nexus UI Library with Key System, Draggable UI, Position Saving & Discord Integration
+-- Nexus UI Library with Auto-Positioning, Key System, Draggable UI & UI Components
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -9,8 +9,9 @@ local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local TextService = game:GetService("TextService")
 
--- Colors with better organization and more options
+-- Colors
 NexusUI.Colors = {
     Primary = Color3.fromRGB(99, 102, 241),
     PrimaryDark = Color3.fromRGB(79, 70, 229),
@@ -27,7 +28,7 @@ NexusUI.Colors = {
     Info = Color3.fromRGB(59, 130, 246)
 }
 
--- Enhanced animations
+-- Animations
 NexusUI.Animations = {
     ButtonHover = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
     ButtonClick = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -38,6 +39,19 @@ NexusUI.Animations = {
     Bounce = TweenInfo.new(0.5, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
 }
 
+-- Built-in positioning system
+NexusUI.Positions = {
+    TopLeft = UDim2.new(0, 20, 0, 20),
+    TopCenter = UDim2.new(0.5, -300, 0, 20),
+    TopRight = UDim2.new(1, -620, 0, 20),
+    CenterLeft = UDim2.new(0, 20, 0.5, -200),
+    Center = UDim2.new(0.5, -300, 0.5, -200),
+    CenterRight = UDim2.new(1, -620, 0.5, -200),
+    BottomLeft = UDim2.new(0, 20, 1, -420),
+    BottomCenter = UDim2.new(0.5, -300, 1, -420),
+    BottomRight = UDim2.new(1, -620, 1, -420)
+}
+
 -- Default configuration
 NexusUI.DefaultConfig = {
     Theme = "Dark",
@@ -45,7 +59,8 @@ NexusUI.DefaultConfig = {
     SoundEnabled = false,
     AutoSavePosition = true,
     RoundCorners = true,
-    SaveKey = "NexusUI_Data"
+    SaveKey = "NexusUI_Data",
+    DefaultPosition = "Center"
 }
 
 -- Initialize NexusUI
@@ -63,6 +78,7 @@ function NexusUI:Init(options)
     self.GetKeyLink = options.GetKeyLink or "https://example.com/getkey"
     self.KeyWhitelist = options.KeyWhitelist or {}
     self.SavedData = {}
+    self.WindowCounter = 0
     
     -- Load saved data
     self:LoadData()
@@ -70,16 +86,12 @@ function NexusUI:Init(options)
     return self
 end
 
--- Data persistence using Roblox's datastores or alternative methods
+-- Data persistence
 function NexusUI:SaveData()
     if self.options.AutoSavePosition then
         pcall(function()
-            -- Try to save to datastore if available
             local data = HttpService:JSONEncode(self.SavedData)
-            if syn then
-                syn.set_clipboard(data) -- Alternative save method
-            end
-            -- You can implement proper datastore saving here
+            -- Save implementation here
         end)
     end
 end
@@ -90,11 +102,6 @@ function NexusUI:LoadData()
         Settings = {},
         Verified = false
     }
-    
-    -- Load verification status
-    if self.SavedData.Verified then
-        self.Verified = true
-    end
 end
 
 function NexusUI:SaveWindowPosition(windowName, position)
@@ -116,12 +123,47 @@ function NexusUI:LoadWindowPosition(windowName, defaultPosition)
     return defaultPosition
 end
 
--- Utility to create elements with better error handling
+-- Smart positioning system
+function NexusUI:GetSmartPosition(positionOption, windowIndex)
+    if type(positionOption) == "string" then
+        -- Use built-in position
+        if NexusUI.Positions[positionOption] then
+            local basePos = NexusUI.Positions[positionOption]
+            if windowIndex > 1 then
+                -- Offset multiple windows to avoid overlapping
+                local offset = (windowIndex - 1) * 30
+                return UDim2.new(
+                    basePos.X.Scale, 
+                    basePos.X.Offset + offset,
+                    basePos.Y.Scale, 
+                    basePos.Y.Offset + offset
+                )
+            end
+            return basePos
+        else
+            warn("[NexusUI] Unknown position: " .. positionOption .. ", using Center")
+            return NexusUI.Positions.Center
+        end
+    elseif typeof(positionOption) == "UDim2" then
+        -- Use custom UDim2 position
+        return positionOption
+    else
+        -- Use default position with smart offset
+        local defaultPos = NexusUI.Positions[self.options.DefaultPosition]
+        local offset = (windowIndex - 1) * 30
+        return UDim2.new(
+            defaultPos.X.Scale, 
+            defaultPos.X.Offset + offset,
+            defaultPos.Y.Scale, 
+            defaultPos.Y.Offset + offset
+        )
+    end
+end
+
+-- Utility to create elements
 function NexusUI:CreateElement(className, props, children)
     local success, element = pcall(function()
         local e = Instance.new(className)
-        
-        -- Apply properties
         if props then
             for k, v in pairs(props) do
                 if k ~= "Parent" then
@@ -129,31 +171,24 @@ function NexusUI:CreateElement(className, props, children)
                 end
             end
         end
-        
-        -- Add children
         if children then
             for _, child in ipairs(children) do
                 child.Parent = e
             end
         end
-        
-        -- Set parent last to avoid unnecessary redraws
         if props and props.Parent then
             e.Parent = props.Parent
         end
-        
         return e
     end)
-    
     if not success then
         warn(`[NexusUI] Failed to create element: {className}`)
         return nil
     end
-    
     return element
 end
 
--- Enhanced draggable window system with position saving
+-- Enhanced draggable window system
 function NexusUI:MakeDraggable(frame, dragHandle, windowName)
     dragHandle = dragHandle or frame
     local dragging = false
@@ -168,8 +203,6 @@ function NexusUI:MakeDraggable(frame, dragHandle, windowName)
             startPos.Y.Offset + delta.Y
         )
         frame.Position = newPosition
-        
-        -- Auto-save position while dragging
         if self.options.AutoSavePosition and windowName then
             self:SaveWindowPosition(windowName, newPosition)
         end
@@ -180,7 +213,6 @@ function NexusUI:MakeDraggable(frame, dragHandle, windowName)
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -202,16 +234,10 @@ function NexusUI:MakeDraggable(frame, dragHandle, windowName)
     end)
 end
 
--- Validate key with enhanced security
+-- Validate key
 function NexusUI:ValidateKey(key)
-    if not key or type(key) ~= "string" then
-        return false
-    end
-    
-    -- Trim whitespace
+    if not key or type(key) ~= "string" then return false end
     key = key:gsub("%s+", "")
-    
-    -- Check against key list
     for _, validKey in ipairs(self.Keys) do
         if key == validKey then
             self.Verified = true
@@ -220,80 +246,329 @@ function NexusUI:ValidateKey(key)
             return true
         end
     end
-    
     return false
 end
 
--- Enhanced Key System GUI
+-- Key System GUI
 function NexusUI:CreateKeySystem(getKeyLink)
     getKeyLink = getKeyLink or self.GetKeyLink
-    
     local gui = self:CreateElement("ScreenGui", {
-        Parent = self.Parent,
-        Name = "NexusKeySystem",
-        IgnoreGuiInset = true,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        Parent = self.Parent, Name = "NexusKeySystem", IgnoreGuiInset = true
     })
     
     local background = self:CreateElement("Frame", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundColor3 = Color3.new(0, 0, 0),
-        BackgroundTransparency = 0.3,
-        Parent = gui
+        BackgroundTransparency = 0.3, Parent = gui
     })
     
     local frame = self:CreateElement("Frame", {
         Size = UDim2.new(0, 450, 0, 280),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = self.Colors.Darker,
-        Parent = gui
+        Position = self.Positions.Center,
+        BackgroundColor3 = self.Colors.Darker, Parent = gui
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 16)}),
+        self:CreateElement("UIStroke", {Color = self.Colors.Primary, Thickness = 2})
     })
     
-    -- UI Elements
-    local corner = self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 16), Parent = frame})
-    local stroke = self:CreateElement("UIStroke", {
-        Parent = frame,
-        Color = self.Colors.Primary,
-        Thickness = 2
-    })
-    
+    -- Key system UI elements...
     local title = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, -40, 0, 60),
-        Position = UDim2.new(0, 20, 0, 0),
-        Text = "🔐 NEXUS UI - ACCESS REQUIRED",
-        TextColor3 = self.Colors.Light,
-        Font = Enum.Font.GothamBold,
-        TextSize = 22,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = frame
+        Size = UDim2.new(1, -40, 0, 60), Position = UDim2.new(0, 20, 0, 0),
+        Text = "🔐 NEXUS UI - ACCESS REQUIRED", TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold, TextSize = 22, BackgroundTransparency = 1, Parent = frame
     })
     
-    local description = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, -40, 0, 40),
-        Position = UDim2.new(0, 20, 0, 50),
-        Text = "Enter your key below to access Nexus UI features",
-        TextColor3 = self.Colors.GrayLight,
+    local keyBox = self:CreateElement("TextBox", {
+        Size = UDim2.new(1, -40, 0, 45), Position = UDim2.new(0, 20, 0, 100),
+        BackgroundColor3 = self.Colors.Dark, TextColor3 = self.Colors.Light,
+        PlaceholderText = "Enter your key here...", Font = Enum.Font.Gotham,
+        TextSize = 16, Parent = frame
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)})
+    })
+    
+    local submit = self:CreateElement("TextButton", {
+        Size = UDim2.new(0.5, -5, 0, 40), Position = UDim2.new(0, 20, 1, -70),
+        BackgroundColor3 = self.Colors.Primary, Text = "VERIFY KEY",
+        TextColor3 = self.Colors.Light, Font = Enum.Font.GothamBold, Parent = frame
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)})
+    })
+    
+    self:MakeDraggable(frame, title)
+    self:ApplyButtonEffects(submit)
+    
+    submit.MouseButton1Click:Connect(function()
+        if self:ValidateKey(keyBox.Text) then
+            self:PlaySuccessAnimation(frame)
+            task.wait(0.5)
+            gui:Destroy()
+        else
+            self:PlayErrorAnimation(keyBox)
+            keyBox.Text = ""
+            keyBox.PlaceholderText = "Invalid key!"
+        end
+    end)
+    
+    table.insert(self.Components, gui)
+    return gui
+end
+
+-- UI COMPONENTS SECTION --
+
+-- Create Button with various styles
+function NexusUI:CreateButton(parent, options)
+    options = options or {}
+    local button = self:CreateElement("TextButton", {
+        Size = options.Size or UDim2.new(0, 200, 0, 40),
+        Position = options.Position or UDim2.new(0.5, -100, 0, 20),
+        BackgroundColor3 = options.Color or self.Colors.Primary,
+        Text = options.Text or "Button",
+        TextColor3 = options.TextColor or self.Colors.Light,
+        Font = Enum.Font.GothamBold,
+        TextSize = options.TextSize or 14,
+        Parent = parent
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)}),
+        self:CreateElement("UIStroke", {
+            Color = self:DarkenColor(options.Color or self.Colors.Primary, 0.3),
+            Thickness = 2
+        })
+    })
+    
+    self:ApplyButtonEffects(button)
+    
+    if options.Callback then
+        button.MouseButton1Click:Connect(options.Callback)
+    end
+    
+    return button
+end
+
+-- Create Toggle Switch
+function NexusUI:CreateToggle(parent, options)
+    options = options or {}
+    local toggleState = options.Default or false
+    
+    local toggleFrame = self:CreateElement("Frame", {
+        Size = options.Size or UDim2.new(0, 60, 0, 30),
+        Position = options.Position or UDim2.new(0, 20, 0, 20),
+        BackgroundColor3 = toggleState and (options.Color or self.Colors.Success) or self.Colors.Gray,
+        Parent = parent
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
+    })
+    
+    local toggleButton = self:CreateElement("Frame", {
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = toggleState and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12),
+        BackgroundColor3 = self.Colors.Light,
+        Parent = toggleFrame
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
+    })
+    
+    local toggleLabel = self:CreateElement("TextLabel", {
+        Size = UDim2.new(0, 200, 0, 30),
+        Position = UDim2.new(1, 10, 0, 0),
+        Text = options.Text or "Toggle",
+        TextColor3 = self.Colors.Light,
         Font = Enum.Font.Gotham,
         TextSize = 14,
         BackgroundTransparency = 1,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = frame
+        Parent = toggleFrame
     })
     
-    local keyBox = self:CreateElement("TextBox", {
-        Size = UDim2.new(1, -40, 0, 45),
-        Position = UDim2.new(0, 20, 0, 100),
+    local function updateToggle()
+        self:Tween(toggleFrame, self.Animations.ButtonClick, {
+            BackgroundColor3 = toggleState and (options.Color or self.Colors.Success) or self.Colors.Gray
+        })
+        self:Tween(toggleButton, self.Animations.ButtonClick, {
+            Position = toggleState and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12)
+        })
+    end
+    
+    toggleFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            toggleState = not toggleState
+            updateToggle()
+            if options.Callback then
+                options.Callback(toggleState)
+            end
+        end
+    end)
+    
+    self:ApplyButtonEffects(toggleFrame)
+    
+    return {
+        Frame = toggleFrame,
+        SetState = function(state)
+            toggleState = state
+            updateToggle()
+        end,
+        GetState = function() return toggleState end
+    }
+end
+
+-- Create Slider
+function NexusUI:CreateSlider(parent, options)
+    options = options or {}
+    local min = options.Min or 0
+    local max = options.Max or 100
+    local current = options.Default or min
+    
+    local sliderContainer = self:CreateElement("Frame", {
+        Size = options.Size or UDim2.new(0, 300, 0, 60),
+        Position = options.Position or UDim2.new(0, 20, 0, 60),
+        BackgroundTransparency = 1,
+        Parent = parent
+    })
+    
+    local sliderLabel = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 20),
+        Text = options.Text or "Slider: " .. current,
+        TextColor3 = self.Colors.Light,
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = sliderContainer
+    })
+    
+    local sliderTrack = self:CreateElement("Frame", {
+        Size = UDim2.new(1, 0, 0, 6),
+        Position = UDim2.new(0, 0, 0, 30),
+        BackgroundColor3 = self.Colors.Dark,
+        Parent = sliderContainer
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
+    })
+    
+    local sliderFill = self:CreateElement("Frame", {
+        Size = UDim2.new((current - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = options.Color or self.Colors.Primary,
+        Parent = sliderTrack
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
+    })
+    
+    local sliderButton = self:CreateElement("TextButton", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new((current - min) / (max - min), -10, 0.5, -10),
+        BackgroundColor3 = self.Colors.Light,
+        Text = "",
+        Parent = sliderTrack
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)}),
+        self:CreateElement("UIStroke", {
+            Color = options.Color or self.Colors.Primary,
+            Thickness = 2
+        })
+    })
+    
+    local function updateSlider(value)
+        current = math.clamp(value, min, max)
+        local fillWidth = (current - min) / (max - min)
+        sliderFill.Size = UDim2.new(fillWidth, 0, 1, 0)
+        sliderButton.Position = UDim2.new(fillWidth, -10, 0.5, -10)
+        sliderLabel.Text = options.Text or "Slider: " .. math.floor(current)
+        
+        if options.Callback then
+            options.Callback(current)
+        end
+    end
+    
+    local dragging = false
+    sliderButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    
+    sliderButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    sliderTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local relativeX = input.Position.X - sliderTrack.AbsolutePosition.X
+            local percentage = relativeX / sliderTrack.AbsoluteSize.X
+            updateSlider(min + percentage * (max - min))
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = input.Position.X - sliderTrack.AbsolutePosition.X
+            local percentage = math.clamp(relativeX / sliderTrack.AbsoluteSize.X, 0, 1)
+            updateSlider(min + percentage * (max - min))
+        end
+    end)
+    
+    return {
+        Container = sliderContainer,
+        SetValue = updateSlider,
+        GetValue = function() return current end
+    }
+end
+
+-- Create Label
+function NexusUI:CreateLabel(parent, options)
+    options = options or {}
+    return self:CreateElement("TextLabel", {
+        Size = options.Size or UDim2.new(1, -40, 0, 30),
+        Position = options.Position or UDim2.new(0, 20, 0, 20),
+        Text = options.Text or "Label",
+        TextColor3 = options.Color or self.Colors.Light,
+        Font = options.Font or Enum.Font.Gotham,
+        TextSize = options.TextSize or 14,
+        BackgroundTransparency = 1,
+        TextXAlignment = options.Alignment or Enum.TextXAlignment.Left,
+        TextWrapped = true,
+        Parent = parent
+    })
+end
+
+-- Create TextBox
+function NexusUI:CreateTextBox(parent, options)
+    options = options or {}
+    return self:CreateElement("TextBox", {
+        Size = options.Size or UDim2.new(1, -40, 0, 40),
+        Position = options.Position or UDim2.new(0, 20, 0, 60),
         BackgroundColor3 = self.Colors.Dark,
         TextColor3 = self.Colors.Light,
-        PlaceholderText = "Enter your key here...",
+        PlaceholderText = options.Placeholder or "Enter text...",
         PlaceholderColor3 = self.Colors.Gray,
+        Text = options.Text or "",
         Font = Enum.Font.Gotham,
-        TextSize = 16,
-        Text = "",
-        ClearTextOnFocus = false,
-        Parent = frame
+        TextSize = 14,
+        ClearTextOnFocus = options.ClearOnFocus or false,
+        Parent = parent
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)}),
+        self:CreateElement("UIStroke", {
+            Color = self.Colors.Gray,
+            Thickness = 1
+        })
+    })
+end
+
+-- Create Dropdown
+function NexusUI:CreateDropdown(parent, options)
+    options = options or {}
+    local items = options.Items or {"Option 1", "Option 2", "Option 3"}
+    local selected = options.Default or items[1]
+    local isOpen = false
+    
+    local dropdown = self:CreateElement("Frame", {
+        Size = options.Size or UDim2.new(0, 200, 0, 40),
+        Position = options.Position or UDim2.new(0, 20, 0, 100),
+        BackgroundColor3 = self.Colors.Dark,
+        ClipsDescendants = true,
+        Parent = parent
     }, {
         self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)}),
         self:CreateElement("UIStroke", {
@@ -302,96 +577,104 @@ function NexusUI:CreateKeySystem(getKeyLink)
         })
     })
     
-    local buttonContainer = self:CreateElement("Frame", {
-        Size = UDim2.new(1, -40, 0, 50),
-        Position = UDim2.new(0, 20, 1, -70),
-        BackgroundTransparency = 1,
-        Parent = frame
-    })
-    
-    local submit = self:CreateElement("TextButton", {
-        Size = UDim2.new(0.5, -5, 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        BackgroundColor3 = self.Colors.Primary,
-        Text = "VERIFY KEY",
+    local selectedLabel = self:CreateElement("TextLabel", {
+        Size = UDim2.new(1, -30, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        Text = selected,
         TextColor3 = self.Colors.Light,
-        Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        Parent = buttonContainer
-    }, {
-        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)})
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = dropdown
     })
     
-    local getBtn = self:CreateElement("TextButton", {
-        Size = UDim2.new(0.5, -5, 1, 0),
-        Position = UDim2.new(0.5, 5, 0, 0),
-        BackgroundColor3 = self.Colors.GrayLight,
-        Text = "GET KEY",
-        TextColor3 = self.Colors.Dark,
-        Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        Parent = buttonContainer
-    }, {
-        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)})
+    local arrow = self:CreateElement("TextLabel", {
+        Size = UDim2.new(0, 20, 1, 0),
+        Position = UDim2.new(1, -25, 0, 0),
+        Text = "▼",
+        TextColor3 = self.Colors.Gray,
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        BackgroundTransparency = 1,
+        Parent = dropdown
     })
     
-    -- Make draggable
-    self:MakeDraggable(frame, title)
+    local optionsFrame = self:CreateElement("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        Position = UDim2.new(0, 0, 1, 5),
+        BackgroundColor3 = self.Colors.Darker,
+        Visible = false,
+        Parent = dropdown
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 8)}),
+        self:CreateElement("UIStroke", {
+            Color = self.Colors.Gray,
+            Thickness = 1
+        })
+    })
     
-    -- Button animations
-    self:ApplyButtonEffects(submit)
-    self:ApplyButtonEffects(getBtn)
+    local function toggleDropdown()
+        isOpen = not isOpen
+        optionsFrame.Visible = isOpen
+        self:Tween(optionsFrame, self.Animations.SlideIn, {
+            Size = isOpen and UDim2.new(1, 0, 0, #items * 30) or UDim2.new(1, 0, 0, 0)
+        })
+        arrow.Text = isOpen and "▲" or "▼"
+    end
     
-    -- Event handlers
-    local function onSubmit()
-        if self:ValidateKey(keyBox.Text) then
-            self:PlaySuccessAnimation(frame)
-            task.wait(0.5)
-            gui:Destroy()
-            -- Notify any waiting windows
-            for _, window in ipairs(self.Windows) do
-                if window.OnVerified then
-                    window.OnVerified()
-                end
-            end
-        else
-            self:PlayErrorAnimation(keyBox)
-            keyBox.Text = ""
-            keyBox.PlaceholderText = "Invalid key, please try again"
-            keyBox.PlaceholderColor3 = self.Colors.Error
+    local function selectItem(item)
+        selected = item
+        selectedLabel.Text = item
+        toggleDropdown()
+        if options.Callback then
+            options.Callback(item)
         end
     end
     
-    submit.MouseButton1Click:Connect(onSubmit)
-    keyBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            onSubmit()
+    -- Create option buttons
+    for i, item in ipairs(items) do
+        local option = self:CreateElement("TextButton", {
+            Size = UDim2.new(1, 0, 0, 30),
+            Position = UDim2.new(0, 0, 0, (i-1)*30),
+            BackgroundColor3 = self.Colors.Darker,
+            Text = item,
+            TextColor3 = self.Colors.Light,
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+            Parent = optionsFrame
+        })
+        
+        option.MouseButton1Click:Connect(function()
+            selectItem(item)
+        end)
+        
+        self:ApplyButtonEffects(option)
+    end
+    
+    dropdown.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            toggleDropdown()
         end
     end)
     
-    getBtn.MouseButton1Click:Connect(function()
-        if pcall(function() setclipboard(getKeyLink) end) then
-            getBtn.Text = "COPIED!"
-            task.wait(1)
-            getBtn.Text = "GET KEY"
-        end
-    end)
-    
-    table.insert(self.Components, gui)
-    return gui
+    return {
+        Frame = dropdown,
+        GetSelected = function() return selected end,
+        SetSelected = selectItem
+    }
 end
 
--- Create Discord Button (NEW FEATURE)
+-- Discord Button
 function NexusUI:CreateDiscordButton(parent, discordLink, options)
     options = options or {}
-    local discordLink = discordLink or "https://discord.gg/example"
+    discordLink = discordLink or "https://discord.gg/example"
     
     local discordBtn = self:CreateElement("TextButton", {
         Size = options.Size or UDim2.new(0, 120, 0, 35),
         Position = options.Position or UDim2.new(1, -130, 1, -45),
-        AnchorPoint = options.AnchorPoint or Vector2.new(0, 0),
         BackgroundColor3 = self.Colors.Discord,
-        Text = "📱 Discord",
+        Text = options.Text or "📱 Discord",
         TextColor3 = self.Colors.Light,
         Font = Enum.Font.GothamBold,
         TextSize = options.TextSize or 12,
@@ -404,10 +687,8 @@ function NexusUI:CreateDiscordButton(parent, discordLink, options)
         })
     })
     
-    -- Apply button effects
     self:ApplyButtonEffects(discordBtn)
     
-    -- Click event
     discordBtn.MouseButton1Click:Connect(function()
         if pcall(function() setclipboard(discordLink) end) then
             local originalText = discordBtn.Text
@@ -417,23 +698,13 @@ function NexusUI:CreateDiscordButton(parent, discordLink, options)
             end
             task.wait(1.5)
             discordBtn.Text = originalText
-        else
-            -- Fallback: Open browser
-            pcall(function()
-                if syn then
-                    syn.request({
-                        Url = discordLink,
-                        Method = "GET"
-                    })
-                end
-            end)
         end
     end)
     
     return discordBtn
 end
 
--- Apply button hover/click effects
+-- Apply button effects
 function NexusUI:ApplyButtonEffects(button)
     local originalSize = button.Size
     local originalColor = button.BackgroundColor3
@@ -471,11 +742,10 @@ function NexusUI:ApplyButtonEffects(button)
     end)
 end
 
--- Create Main Window with enhanced features
+-- Create Main Window with auto-positioning
 function NexusUI:CreateWindow(options)
     options = options or {}
     
-    -- Check key system
     if self.KeySystemEnabled and not self.Verified then
         local windowData = {Options = options, OnVerified = function()
             self:CreateWindow(options)
@@ -485,98 +755,61 @@ function NexusUI:CreateWindow(options)
         return windowData
     end
     
+    self.WindowCounter = self.WindowCounter + 1
     local window = {Tabs = {}, Elements = {}}
-    local guiName = options.Name or "NexusUI_" .. HttpService:GenerateGUID(false):sub(1, 8)
+    local guiName = options.Name or "NexusUI_" .. self.WindowCounter
     
     local gui = self:CreateElement("ScreenGui", {
-        Parent = self.Parent,
-        Name = guiName,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        IgnoreGuiInset = true
+        Parent = self.Parent, Name = guiName, IgnoreGuiInset = true
     })
     
-    -- Load saved position
-    local defaultPosition = options.Position or UDim2.new(0.5, -300, 0.5, -200)
-    local savedPosition = self:LoadWindowPosition(guiName, defaultPosition)
+    -- Use smart positioning
+    local defaultPos = self:GetSmartPosition(options.Position or self.options.DefaultPosition, self.WindowCounter)
+    local savedPosition = self:LoadWindowPosition(guiName, defaultPos)
     
     local frame = self:CreateElement("Frame", {
-        Size = options.Size or UDim2.new(0, 600, 0, 400),
+        Size = options.Size or UDim2.new(0, 500, 0, 400),
         Position = savedPosition,
-        BackgroundColor3 = self.Colors.Darker,
-        Parent = gui
-    })
-    
-    -- Window styling
-    if self.options.RoundCorners then
-        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 12), Parent = frame})
-    end
-    
-    self:CreateElement("UIStroke", {
-        Parent = frame,
-        Color = self.Colors.Primary,
-        Thickness = 2
+        BackgroundColor3 = self.Colors.Darker, Parent = gui
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 12)}),
+        self:CreateElement("UIStroke", {Color = self.Colors.Primary, Thickness = 2})
     })
     
     -- Title bar
     local titleBar = self:CreateElement("Frame", {
-        Size = UDim2.new(1, 0, 0, 40),
-        BackgroundColor3 = self.Colors.Dark,
-        Parent = frame
+        Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = self.Colors.Dark, Parent = frame
+    }, {
+        self:CreateElement("UICorner", {CornerRadius = UDim.new(0, 12, 0, 0)})
     })
-    
-    if self.options.RoundCorners then
-        self:CreateElement("UICorner", {
-            CornerRadius = UDim.new(0, 12, 0, 0),
-            Parent = titleBar
-        })
-    end
     
     local title = self:CreateElement("TextLabel", {
-        Size = UDim2.new(1, -80, 1, 0),
-        Position = UDim2.new(0, 15, 0, 0),
-        Text = options.Title or "Nexus UI Window",
-        TextColor3 = self.Colors.Light,
-        Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        BackgroundTransparency = 1,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = titleBar
+        Size = UDim2.new(1, -80, 1, 0), Position = UDim2.new(0, 15, 0, 0),
+        Text = options.Title or "Nexus UI Window", TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold, TextSize = 16, BackgroundTransparency = 1,
+        TextXAlignment = Enum.TextXAlignment.Left, Parent = titleBar
     })
     
-    -- Close button
     local closeBtn = self:CreateElement("TextButton", {
-        Size = UDim2.new(0, 30, 0, 30),
-        Position = UDim2.new(1, -35, 0, 5),
-        BackgroundColor3 = self.Colors.Error,
-        Text = "×",
-        TextColor3 = self.Colors.Light,
-        Font = Enum.Font.GothamBold,
-        TextSize = 20,
-        Parent = titleBar
+        Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 5),
+        BackgroundColor3 = self.Colors.Error, Text = "×", TextColor3 = self.Colors.Light,
+        Font = Enum.Font.GothamBold, TextSize = 20, Parent = titleBar
     }, {
         self:CreateElement("UICorner", {CornerRadius = UDim.new(1, 0)})
     })
     
-    -- Add Discord button to title bar if requested
+    -- Add Discord button if link provided
     if options.DiscordLink then
-        self:CreateDiscordButton(frame, options.DiscordLink, {
-            Position = UDim2.new(1, -160, 0, 5),
-            Size = UDim2.new(0, 120, 0, 30)
-        })
+        self:CreateDiscordButton(frame, options.DiscordLink)
     end
     
-    -- Make draggable via title bar with position saving
     self:MakeDraggable(frame, titleBar, guiName)
-    
-    -- Apply button effects
     self:ApplyButtonEffects(closeBtn)
     
-    -- Close event
     closeBtn.MouseButton1Click:Connect(function()
         self:CloseWindow(gui)
     end)
     
-    -- Store window data
     window.GUI = gui
     window.Frame = frame
     window.TitleBar = titleBar
@@ -601,18 +834,6 @@ function NexusUI:CreateWindow(options)
     end
     
     return window
-end
-
--- Close window with animation
-function NexusUI:CloseWindow(gui)
-    if self.options.AnimationEnabled then
-        local frame = gui:FindFirstChildOfClass("Frame")
-        if frame then
-            self:Tween(frame, self.Animations.FadeOut, {BackgroundTransparency = 1})
-            task.wait(0.2)
-        end
-    end
-    gui:Destroy()
 end
 
 -- Utility methods
@@ -647,9 +868,20 @@ function NexusUI:PlayErrorAnimation(instance)
     end
 end
 
+function NexusUI:CloseWindow(gui)
+    if self.options.AnimationEnabled then
+        local frame = gui:FindFirstChildOfClass("Frame")
+        if frame then
+            self:Tween(frame, self.Animations.FadeOut, {BackgroundTransparency = 1})
+            task.wait(0.2)
+        end
+    end
+    gui:Destroy()
+end
+
 -- Cleanup method
 function NexusUI:Destroy()
-    for _, component in ipairs(self.Components) do
+    for _, component in ip    for _, component in ipairs(self.Components) do
         pcall(function() component:Destroy() end)
     end
     for _, window in ipairs(self.Windows) do
