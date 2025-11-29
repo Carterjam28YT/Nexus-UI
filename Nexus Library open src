@@ -1,240 +1,180 @@
--- Nexus UI Library Full Example
--- Author: Carterjam28
--- Features: Key system, draggable UI, Discord button, Tabs, Sections, Buttons, Toggles, Sliders, Notifications
-
+-- Nexus UI Library
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
--- Services
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-
--- Color palette
-NexusUI.Colors = {
-    Primary = Color3.fromRGB(99, 102, 241),
-    PrimaryDark = Color3.fromRGB(79, 70, 229),
-    Secondary = Color3.fromRGB(244, 63, 94),
-    Dark = Color3.fromRGB(30, 41, 59),
-    Darker = Color3.fromRGB(15, 23, 42),
-    Light = Color3.fromRGB(248, 250, 252),
-    Gray = Color3.fromRGB(100, 116, 139),
-    GrayLight = Color3.fromRGB(203, 213, 225),
-    Success = Color3.fromRGB(16, 185, 129),
-    Warning = Color3.fromRGB(245, 158, 11),
-    Error = Color3.fromRGB(239, 68, 68)
-}
-
--- Tween presets
-NexusUI.Animations = {
-    ButtonHover = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    ButtonClick = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    FadeIn = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    SlideIn = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-}
-
--- Init
-function NexusUI:Init(options)
+function NexusUI:Init(config)
     local self = setmetatable({}, NexusUI)
-    self.KeySystemEnabled = options.KeySystem or false
-    self.DiscordInvite = options.DiscordInvite or "https://discord.gg/example"
-    self.Parent = CoreGui
-    self.Components = {}
+    
+    -- Config
+    self.KeySystemEnabled = config.KeySystem or false
+    self.AllowedKeys = config.Keys or {}
+    self.GetKeyLink = config.GetKeyLink or ""
+    self.DiscordInvite = config.DiscordInvite or ""
+    
     self.Windows = {}
-    self.Verified = false
-    self.Keys = options.Keys or {"NEXUS-KEY-123","VIP-KEY-001"}
-    self.GetKeyLink = options.GetKeyLink or "https://discord.gg/example"
+    self.Verified = not self.KeySystemEnabled
+
+    -- Services
+    self.Players = game:GetService("Players")
+    self.UserInput = game:GetService("UserInputService")
+    self.RunService = game:GetService("RunService")
+    self.CoreGui = game:GetService("CoreGui")
+
     return self
 end
 
--- Utility
-function NexusUI:CreateElement(class, props)
-    local obj = Instance.new(class)
-    for k,v in pairs(props) do
-        obj[k] = v
+-- Create main window
+function NexusUI:CreateWindow(info)
+    local window = {}
+    window.Tabs = {}
+    
+    local playerGui = self.Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Main ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = info.Name or "NexusUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+    
+    -- Main Frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 500, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.Parent = screenGui
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+
+    -- Top bar
+    local topBar = Instance.new("Frame")
+    topBar.Size = UDim2.new(1, 0, 0, 40)
+    topBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    topBar.Parent = mainFrame
+
+    -- Window title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.6, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = info.Name or "Nexus UI"
+    titleLabel.TextColor3 = Color3.new(1,1,1)
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 20
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = topBar
+
+    -- Discord Button
+    if info.Discord then
+        local discordButton = Instance.new("TextButton")
+        discordButton.Size = UDim2.new(0, 100, 1, -8)
+        discordButton.Position = UDim2.new(1, -110, 0, 4)
+        discordButton.Text = "Discord"
+        discordButton.Font = Enum.Font.SourceSansBold
+        discordButton.TextSize = 18
+        discordButton.TextColor3 = Color3.new(1,1,1)
+        discordButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        discordButton.Parent = topBar
+        discordButton.MouseButton1Click:Connect(function()
+            setclipboard(self.DiscordInvite)
+        end)
     end
-    return obj
-end
 
--- Key Validation
-function NexusUI:ValidateKey(key)
-    for _,k in ipairs(self.Keys) do
-        if k == key then
-            self.Verified = true
-            return true
-        end
-    end
-    return false
-end
-
--- Key UI
-function NexusUI:CreateKeyUI()
-    local gui = self:CreateElement("ScreenGui",{Name="NexusKeyUI",Parent=self.Parent,ResetOnSpawn=false})
-    local frame = self:CreateElement("Frame",{
-        Size=UDim2.new(0,400,0,250),
-        Position=UDim2.new(0.5,0,0.5,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Darker,
-        Parent=gui
-    })
-    local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,16),Parent=frame})
-
-    -- Draggable
-    frame.Active = true
-    frame.Draggable = true
-
-    -- Title
-    local title = self:CreateElement("TextLabel",{
-        Size=UDim2.new(1,0,0,50),
-        BackgroundTransparency=1,
-        Text="NEXUS UI - ENTER KEY",
-        TextColor3=self.Colors.Light,
-        Font=Enum.Font.GothamBold,
-        TextSize=24,
-        Parent=frame
-    })
-
-    -- TextBox
-    local keyBox = self:CreateElement("TextBox",{
-        Size=UDim2.new(0,300,0,45),
-        Position=UDim2.new(0.5,0,0.5,-20),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Dark,
-        TextColor3=self.Colors.Light,
-        PlaceholderText="Enter your key...",
-        Font=Enum.Font.Gotham,
-        TextSize=16,
-        Parent=frame
-    })
-    local boxCorner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,8),Parent=keyBox})
-
-    -- Submit Button
-    local submit = self:CreateElement("TextButton",{
-        Size=UDim2.new(0,200,0,45),
-        Position=UDim2.new(0.5,0,0.75,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Primary,
-        TextColor3=self.Colors.Light,
-        Text="SUBMIT KEY",
-        Font=Enum.Font.GothamSemibold,
-        TextSize=16,
-        AutoButtonColor=false,
-        Parent=frame
-    })
-    local submitCorner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,8),Parent=submit})
-
-    -- GET KEY Button
-    local getKey = self:CreateElement("TextButton",{
-        Size=UDim2.new(0,150,0,35),
-        Position=UDim2.new(0.5,0,0.9,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Secondary,
-        TextColor3=self.Colors.Light,
-        Text="GET KEY",
-        Font=Enum.Font.GothamBold,
-        TextSize=14,
-        AutoButtonColor=false,
-        Parent=frame
-    })
-    local getCorner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,8),Parent=getKey})
-
-    -- Result label
-    local result = self:CreateElement("TextLabel",{
-        Size=UDim2.new(1,0,0,25),
-        Position=UDim2.new(0,0,0.6,0),
-        BackgroundTransparency=1,
-        Text="",
-        TextColor3=self.Colors.Error,
-        Font=Enum.Font.Gotham,
-        TextSize=14,
-        Parent=frame
-    })
-
-    submit.MouseButton1Click:Connect(function()
-        if self:ValidateKey(keyBox.Text) then
-            result.TextColor3=self.Colors.Success
-            result.Text="✅ Key Validated!"
-            task.wait(0.5)
-            gui:Destroy()
-            self:CreateWindow({Name="Nexus UI Example",Discord=true})
-        else
-            result.TextColor3=self.Colors.Error
-            result.Text="❌ Invalid Key!"
-        end
+    -- Close Button
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 30, 1, -8)
+    closeButton.Position = UDim2.new(1, -35, 0, 4)
+    closeButton.Text = "X"
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.TextSize = 18
+    closeButton.TextColor3 = Color3.new(1,0,0)
+    closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    closeButton.Parent = topBar
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
     end)
 
-    getKey.MouseButton1Click:Connect(function()
-        if setclipboard then
+    window.ScreenGui = screenGui
+    window.MainFrame = mainFrame
+    table.insert(self.Windows, window)
+
+    -- Key System UI
+    if self.KeySystemEnabled and not self.Verified then
+        self:CreateKeyUI(mainFrame)
+    end
+
+    return window
+end
+
+-- Key System UI
+function NexusUI:CreateKeyUI(parent)
+    local keyFrame = Instance.new("Frame")
+    keyFrame.Size = UDim2.new(0, 300, 0, 150)
+    keyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    keyFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    keyFrame.Parent = parent
+
+    local keyBox = Instance.new("TextBox")
+    keyBox.Size = UDim2.new(1, -20, 0, 40)
+    keyBox.Position = UDim2.new(0,10,0,20)
+    keyBox.PlaceholderText = "Enter Key"
+    keyBox.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    keyBox.TextColor3 = Color3.new(1,1,1)
+    keyBox.Parent = keyFrame
+
+    local submitButton = Instance.new("TextButton")
+    submitButton.Size = UDim2.new(0.4, -10, 0, 40)
+    submitButton.Position = UDim2.new(0,10,0,80)
+    submitButton.Text = "Submit"
+    submitButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    submitButton.TextColor3 = Color3.new(1,1,1)
+    submitButton.Parent = keyFrame
+
+    local getKeyButton = Instance.new("TextButton")
+    getKeyButton.Size = UDim2.new(0.5, -10, 0, 40)
+    getKeyButton.Position = UDim2.new(0.5,5,0,80)
+    getKeyButton.Text = "Get Key"
+    getKeyButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    getKeyButton.TextColor3 = Color3.new(1,1,1)
+    getKeyButton.Parent = keyFrame
+    getKeyButton.MouseButton1Click:Connect(function()
+        if self.GetKeyLink ~= "" then
+            -- Open link in browser (roblox allows limited)
             setclipboard(self.GetKeyLink)
         end
     end)
 
-    table.insert(self.Components,gui)
-end
-
--- Create Main Window
-function NexusUI:CreateWindow(options)
-    if self.KeySystemEnabled and not self.Verified then
-        self:CreateKeyUI()
-        return
-    end
-    local window = {Tabs={}}
-    local gui = self:CreateElement("ScreenGui",{Name="NexusWindow",Parent=self.Parent,ResetOnSpawn=false})
-    local frame = self:CreateElement("Frame",{
-        Size=UDim2.new(0,600,0,400),
-        Position=UDim2.new(0.5,0,0.5,0),
-        AnchorPoint=Vector2.new(0.5,0.5),
-        BackgroundColor3=self.Colors.Darker,
-        Parent=gui
-    })
-    local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,12),Parent=frame})
-
-    -- Top bar
-    local top = self:CreateElement("Frame",{Size=UDim2.new(1,0,0,40),BackgroundColor3=self.Colors.Dark,Parent=frame})
-    local topTitle = self:CreateElement("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=options.Name or "Nexus UI",TextColor3=self.Colors.Light,Font=Enum.Font.GothamBold,TextSize=18,Parent=top})
-    frame.Active=true frame.Draggable=true
-
-    -- Discord Button
-    if options.Discord then
-        local discordBtn = self:CreateElement("TextButton",{Size=UDim2.new(0,120,0,40),Position=UDim2.new(1,-130,1,-50),AnchorPoint=Vector2.new(1,1),BackgroundColor3=self.Colors.Primary,TextColor3=self.Colors.Light,Text="DISCORD",Font=Enum.Font.GothamSemibold,TextSize=14,Parent=gui})
-        local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,8),Parent=discordBtn})
-        discordBtn.MouseButton1Click:Connect(function()
-            if setclipboard then
-                setclipboard(self.DiscordInvite)
+    submitButton.MouseButton1Click:Connect(function()
+        local input = keyBox.Text
+        for _, allowedKey in pairs(self.AllowedKeys) do
+            if input == allowedKey then
+                self.Verified = true
+                keyFrame:Destroy()
+                return
             end
-        end)
-    end
-    table.insert(self.Windows,window)
-end
-
--- Notifications
-function NexusUI:ShowNotification(opts)
-    local frame = self:CreateElement("Frame",{Size=UDim2.new(0,350,0,80),Position=UDim2.new(1,400,0.1,0),AnchorPoint=Vector2.new(1,0),BackgroundColor3=self.Colors.Dark,Parent=self.Parent})
-    local corner = self:CreateElement("UICorner",{CornerRadius=UDim.new(0,12),Parent=frame})
-    local txt = self:CreateElement("TextLabel",{Size=UDim2.new(1,-20,1,-20),Position=UDim2.new(0,10,0,10),BackgroundTransparency=1,Text=opts.Title.."\n"..opts.Message,TextColor3=self.Colors.Light,Font=Enum.Font.Gotham,TextSize=14,TextWrapped=true,Parent=frame})
-    task.delay(opts.Duration or 5,function()
-        frame:Destroy()
+        end
+        -- Wrong key
+        self:ShowNotification({
+            Title = "Invalid Key",
+            Message = "The key you entered is not valid.",
+            Duration = 3
+        })
     end)
 end
 
--- Cleanup
-function NexusUI:Destroy()
-    for _,c in pairs(self.Components) do
-        if c and c.Parent then c:Destroy() end
-    end
-    self.Components={}
+-- Notification
+function NexusUI:ShowNotification(info)
+    local notif = Instance.new("TextLabel")
+    notif.Size = UDim2.new(0, 300, 0, 50)
+    notif.Position = UDim2.new(0.5, -150, 0.8, 0)
+    notif.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    notif.TextColor3 = Color3.new(1,1,1)
+    notif.Text = info.Title.."\n"..info.Message
+    notif.TextWrapped = true
+    notif.TextScaled = true
+    notif.Parent = self.Players.LocalPlayer:WaitForChild("PlayerGui")
+    task.delay(info.Duration or 3, function()
+        notif:Destroy()
+    end)
 end
 
-getgenv().NexusUI = NexusUI
 return NexusUI
-
---[[ USAGE EXAMPLE
-local UI = require(path_to_this_file):Init({
-    KeySystem=true,
-    Keys={"MYKEY123","VIPACCESS"},
-    GetKeyLink="https://discord.gg/example",
-    DiscordInvite="https://discord.gg/example"
-})
-UI:CreateWindow({Name="Nexus Example",Discord=true})
-]]
