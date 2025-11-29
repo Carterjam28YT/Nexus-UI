@@ -3,178 +3,184 @@ local NexusUI = {}
 NexusUI.__index = NexusUI
 
 function NexusUI:Init(config)
-    local self = setmetatable({}, NexusUI)
-    
-    -- Config
+    config = config or {}
     self.KeySystemEnabled = config.KeySystem or false
-    self.AllowedKeys = config.Keys or {}
+    self.Keys = config.Keys or {}
     self.GetKeyLink = config.GetKeyLink or ""
     self.DiscordInvite = config.DiscordInvite or ""
-    
     self.Windows = {}
     self.Verified = not self.KeySystemEnabled
-
-    -- Services
-    self.Players = game:GetService("Players")
-    self.UserInput = game:GetService("UserInputService")
-    self.RunService = game:GetService("RunService")
-    self.CoreGui = game:GetService("CoreGui")
-
     return self
 end
 
--- Create main window
-function NexusUI:CreateWindow(info)
-    local window = {}
-    window.Tabs = {}
-    
-    local playerGui = self.Players.LocalPlayer:WaitForChild("PlayerGui")
-    
-    -- Main ScreenGui
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = info.Name or "NexusUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = playerGui
-    
-    -- Main Frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 500, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.Parent = screenGui
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-
-    -- Top bar
-    local topBar = Instance.new("Frame")
-    topBar.Size = UDim2.new(1, 0, 0, 40)
-    topBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    topBar.Parent = mainFrame
-
-    -- Window title
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.6, 0, 1, 0)
-    titleLabel.Position = UDim2.new(0, 10, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = info.Name or "Nexus UI"
-    titleLabel.TextColor3 = Color3.new(1,1,1)
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.TextSize = 20
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = topBar
-
-    -- Discord Button
-    if info.Discord then
-        local discordButton = Instance.new("TextButton")
-        discordButton.Size = UDim2.new(0, 100, 1, -8)
-        discordButton.Position = UDim2.new(1, -110, 0, 4)
-        discordButton.Text = "Discord"
-        discordButton.Font = Enum.Font.SourceSansBold
-        discordButton.TextSize = 18
-        discordButton.TextColor3 = Color3.new(1,1,1)
-        discordButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        discordButton.Parent = topBar
-        discordButton.MouseButton1Click:Connect(function()
-            setclipboard(self.DiscordInvite)
-        end)
+-- Utility function
+local function CreateInstance(class, props, parent)
+    local inst = Instance.new(class)
+    for k,v in pairs(props or {}) do
+        inst[k] = v
     end
-
-    -- Close Button
-    local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 30, 1, -8)
-    closeButton.Position = UDim2.new(1, -35, 0, 4)
-    closeButton.Text = "X"
-    closeButton.Font = Enum.Font.SourceSansBold
-    closeButton.TextSize = 18
-    closeButton.TextColor3 = Color3.new(1,0,0)
-    closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    closeButton.Parent = topBar
-    closeButton.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
-
-    window.ScreenGui = screenGui
-    window.MainFrame = mainFrame
-    table.insert(self.Windows, window)
-
-    -- Key System UI
-    if self.KeySystemEnabled and not self.Verified then
-        self:CreateKeyUI(mainFrame)
+    if parent then
+        inst.Parent = parent
     end
-
-    return window
-end
-
--- Key System UI
-function NexusUI:CreateKeyUI(parent)
-    local keyFrame = Instance.new("Frame")
-    keyFrame.Size = UDim2.new(0, 300, 0, 150)
-    keyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-    keyFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    keyFrame.Parent = parent
-
-    local keyBox = Instance.new("TextBox")
-    keyBox.Size = UDim2.new(1, -20, 0, 40)
-    keyBox.Position = UDim2.new(0,10,0,20)
-    keyBox.PlaceholderText = "Enter Key"
-    keyBox.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    keyBox.TextColor3 = Color3.new(1,1,1)
-    keyBox.Parent = keyFrame
-
-    local submitButton = Instance.new("TextButton")
-    submitButton.Size = UDim2.new(0.4, -10, 0, 40)
-    submitButton.Position = UDim2.new(0,10,0,80)
-    submitButton.Text = "Submit"
-    submitButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    submitButton.TextColor3 = Color3.new(1,1,1)
-    submitButton.Parent = keyFrame
-
-    local getKeyButton = Instance.new("TextButton")
-    getKeyButton.Size = UDim2.new(0.5, -10, 0, 40)
-    getKeyButton.Position = UDim2.new(0.5,5,0,80)
-    getKeyButton.Text = "Get Key"
-    getKeyButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    getKeyButton.TextColor3 = Color3.new(1,1,1)
-    getKeyButton.Parent = keyFrame
-    getKeyButton.MouseButton1Click:Connect(function()
-        if self.GetKeyLink ~= "" then
-            -- Open link in browser (roblox allows limited)
-            setclipboard(self.GetKeyLink)
-        end
-    end)
-
-    submitButton.MouseButton1Click:Connect(function()
-        local input = keyBox.Text
-        for _, allowedKey in pairs(self.AllowedKeys) do
-            if input == allowedKey then
-                self.Verified = true
-                keyFrame:Destroy()
-                return
-            end
-        end
-        -- Wrong key
-        self:ShowNotification({
-            Title = "Invalid Key",
-            Message = "The key you entered is not valid.",
-            Duration = 3
-        })
-    end)
+    return inst
 end
 
 -- Notification
-function NexusUI:ShowNotification(info)
-    local notif = Instance.new("TextLabel")
-    notif.Size = UDim2.new(0, 300, 0, 50)
-    notif.Position = UDim2.new(0.5, -150, 0.8, 0)
-    notif.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    notif.TextColor3 = Color3.new(1,1,1)
-    notif.Text = info.Title.."\n"..info.Message
-    notif.TextWrapped = true
-    notif.TextScaled = true
-    notif.Parent = self.Players.LocalPlayer:WaitForChild("PlayerGui")
-    task.delay(info.Duration or 3, function()
-        notif:Destroy()
+function NexusUI:ShowNotification(data)
+    data = data or {}
+    local title = data.Title or "Title"
+    local msg = data.Message or "Message"
+    local duration = data.Duration or 3
+
+    local screenGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    local frame = CreateInstance("Frame",{
+        Size = UDim2.new(0,300,0,100),
+        BackgroundColor3 = Color3.fromRGB(85,0,255),
+        AnchorPoint = Vector2.new(0.5,0.5),
+        Position = UDim2.new(0.5,0,0.3,0),
+        BackgroundTransparency = 0.1,
+        ClipsDescendants = true,
+        Parent = screenGui
+    })
+
+    local titleLabel = CreateInstance("TextLabel",{
+        Text = title,
+        Font = Enum.Font.SourceSansBold,
+        TextSize = 20,
+        TextColor3 = Color3.fromRGB(255,255,255),
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1,0,0.4,0),
+        Parent = frame
+    })
+
+    local msgLabel = CreateInstance("TextLabel",{
+        Text = msg,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextColor3 = Color3.fromRGB(255,255,255),
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1,0,0.6,0),
+        Position = UDim2.new(0,0,0.4,0),
+        Parent = frame
+    })
+
+    spawn(function()
+        task.wait(duration)
+        frame:Destroy()
     end)
+end
+
+-- Create Window
+function NexusUI:CreateWindow(data)
+    local data = data or {}
+    local player = game:GetService("Players").LocalPlayer
+    local screenGui = CreateInstance("ScreenGui",{Parent = player:WaitForChild("PlayerGui")})
+
+    local window = CreateInstance("Frame",{
+        Size = UDim2.new(0,500,0,400),
+        BackgroundColor3 = Color3.fromRGB(85,0,255),
+        Position = UDim2.new(0.5,-250,0.3,-200),
+        AnchorPoint = Vector2.new(0.5,0.5),
+        Parent = screenGui
+    })
+
+    -- Top bar (draggable)
+    local topBar = CreateInstance("Frame",{
+        Size = UDim2.new(1,0,0,30),
+        BackgroundColor3 = Color3.fromRGB(60,0,200),
+        Parent = window
+    })
+
+    local drag = false
+    local dragInput, mousePos, framePos
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            drag = true
+            mousePos = input.Position
+            framePos = window.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    drag = false
+                end
+            end)
+        end
+    end)
+    topBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and drag then
+            local delta = input.Position - mousePos
+            window.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X,
+                                        framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Close button
+    local closeBtn = CreateInstance("TextButton",{
+        Text = "X",
+        BackgroundColor3 = Color3.fromRGB(200,0,0),
+        TextColor3 = Color3.new(1,1,1),
+        Size = UDim2.new(0,30,0,30),
+        Position = UDim2.new(1,-30,0,0),
+        Parent = topBar
+    })
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    -- Discord Button
+    if data.Discord then
+        local discordBtn = CreateInstance("TextButton",{
+            Text = "Discord",
+            BackgroundColor3 = Color3.fromRGB(0,0,0),
+            TextColor3 = Color3.new(1,1,1),
+            Size = UDim2.new(0,100,0,25),
+            Position = UDim2.new(0.5,-50,0,2.5),
+            Parent = topBar
+        })
+        discordBtn.MouseButton1Click:Connect(function()
+            setclipboard(self.DiscordInvite)
+            self:ShowNotification({Title="Copied!", Message="Discord invite copied to clipboard.", Duration=2})
+        end)
+    end
+
+    local windowObj = {
+        ScreenGui = screenGui,
+        WindowFrame = window,
+        Tabs = {}
+    }
+
+    function windowObj:CreateTab(name)
+        local tab = {Name=name, Sections={}}
+        table.insert(windowObj.Tabs, tab)
+        return {
+            CreateSection = function(_, secName)
+                local section = {Name=secName, Elements={}}
+                table.insert(tab.Sections, section)
+                return {
+                    CreateButton = function(_, info)
+                        table.insert(section.Elements,{Type="Button",Data=info})
+                        -- Bind callback
+                        info.Callback = info.Callback or function() end
+                    end,
+                    CreateToggle = function(_, info)
+                        table.insert(section.Elements,{Type="Toggle",Data=info})
+                        info.Callback = info.Callback or function(state) end
+                    end,
+                    CreateSlider = function(_, info)
+                        table.insert(section.Elements,{Type="Slider",Data=info})
+                        info.Callback = info.Callback or function(value) end
+                    end
+                }
+            end
+        }
+    end
+
+    table.insert(self.Windows, windowObj)
+    return windowObj
 end
 
 return NexusUI
