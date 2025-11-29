@@ -18,11 +18,11 @@ local Library = {
     WatermarkObj = nil,
     NotifyContainer = nil,
     Preview = nil,
-    ConfigFolder = "RedOnyx_Configs",
+    ConfigFolder = "Nexus_Configs",
     ConfigExt = ".json",
     WatermarkSettings = {
         Enabled = true,
-        Text = "RedOnyx"
+        Text = "Nexus"
     },
     GlobalSettings = {
         Animations = true
@@ -487,7 +487,7 @@ end
 --// MAIN WINDOW //--
 function Library:Window(TitleText)
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "RedOnyx"
+    ScreenGui.Name = "Nexus"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global 
     if RunService:IsStudio() then ScreenGui.Parent = Player:WaitForChild("PlayerGui") else pcall(function() ScreenGui.Parent = CoreGui end) end
